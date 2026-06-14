@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{client.l('login')}}</title>
+    <link rel="stylesheet" type="text/css" href="{{client.url_for('static', filename='css/main.css')}}">
+    <link rel="stylesheet" type="text/css" href="{{client.url_for('static', filename='css/login.css')}}">
+    <style>
+        .error #password_label::after {
+            content: " - {{client.l('incorrect_password')}}";
+        }
+    </style>
+</head>
+<body>
+    <div id="content">
+        <form class="auth" onsubmit="return false">
+            <label id="password_label" for="password">{{client.l('password')}}</label>
+            <input id="password_input" type="password" name="password">
+            <input id="password_view" type="button" value="{{client.l('pass_show')}}" onclick="pass_view()">
+            <input id="password_submit" type="button" value="{{client.l('submit')}}" onclick="send(this)">
+        </form>
+    </div>
+    <script>
+        let texts = {
+            'start': "{{client.l('start')}}",
+            'close': "{{client.l('close')}}",
+            'ready': "{{client.l('ready')}}",
+            'booting': "{{client.l('booting')}}",
+            'closed': "{{client.l('closed')}}",
+            'hide': "{{client.l('pass_hide')}}",
+            'show': "{{client.l('pass_show')}}",
+        }
+    </script>
+    <script type="text/javascript" src="{{client.url_for('static', filename='js/main.js')}}"></script>
+    <script type="text/javascript" src="{{client.url_for('static', filename='js/login.js')}}"></script>
+    <script>
+        const input = document.getElementById('password_input');
+        input.onkeydown = function (e) {
+            keyCheck(input, e);
+        }
+    </script>
+</body>
+</html>
