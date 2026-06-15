@@ -7,6 +7,7 @@ import io
 import random
 import re
 import sys
+from rebootpy.client import is_display_name
 from functools import partial
 from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
                     Optional, Tuple, Type, Union)
@@ -374,7 +375,7 @@ class MyClientParty(rebootpy.ClientParty):
                     'numKills': 0,
                     'bFellToDeath': False,
                 },
-                'GamePlaylistName_s': self.meta.playlist_info[0],
+                'GamePlaylistName_s': getattr(self.meta, 'playlist_info', ['None'])[0],
                 'Event_PlayersAlive_s': '0',
                 'Event_PartySize_s': str(len(self._members)),
                 'Event_PartyMaxSize_s': str(self.max_size),
@@ -702,12 +703,12 @@ class Client(rebootpy.Client):
                                 return
                     except AttributeError:
                         pass
-
-            task = self.http.account_graphql_get_by_display_name(elem)
+            # GraphQL版(404エラー)からREST版に変更
+            task = self.http.account_get_by_display_name(dn)
             tasks.append(task)
 
         for elem in users:
-            if self.is_display_name(elem):
+            if is_display_name(elem):
                 find_by_display_name(elem)
             else:
                 if cache:
@@ -721,29 +722,28 @@ class Client(rebootpy.Client):
                 new.append(elem)
 
         if len(tasks) > 0:
-            pfs = await asyncio.gather(*tasks)
+            pfs = await asyncio.gather(*tasks, return_exceptions=True)
             for p_data in pfs:
-                accounts = p_data['account']
-                for account_data in accounts:
-                    if account_data['displayName'] is not None:
-                        new.append(account_data['id'])
-                        break
-                else:
-                    for account_data in accounts:
-                        if account_data['displayName'] is None:
-                            new.append(account_data['id'])
-                            break
+                if isinstance(p_data, Exception):
+                    continue
+                # REST版は単一dictを返す: {'id': ..., 'displayName': ...}
+                if 'id' in p_data:
+                    new.append(p_data['id'])
 
         chunk_tasks = []
         chunks = [new[i:i + 100] for i in range(0, len(new), 100)]
         for chunk in chunks:
-            task = self.http.account_graphql_get_multiple_by_user_id(chunk)
+            # GraphQL版(404エラー)からREST版に変更
+            task = self.http.account_get_multiple_by_user_id(chunk)
             chunk_tasks.append(task)
 
         if len(chunks) > 0:
-            d = await asyncio.gather(*chunk_tasks)
+            d = await asyncio.gather(*chunk_tasks, return_exceptions=True)
             for results in d:
-                for result in results['accounts']:
+                if isinstance(results, Exception):
+                    continue
+                # REST版はリストを直接返す
+                for result in results:
                     if raw:
                         _users.append(result)
                     else:
@@ -758,14 +758,18 @@ class Client(rebootpy.Client):
         chunk_tasks = []
         chunks = [user_ids[i:i + 100] for i in range(0, len(user_ids), 100)]
         for chunk in chunks:
-            task = self.http.account_graphql_get_multiple_by_user_id(chunk)
+            # GraphQL版(404エラー)からREST版に変更
+            task = self.http.account_get_multiple_by_user_id(chunk)
             chunk_tasks.append(task)
 
         users = {}
         if len(chunks) > 0:
-            d = await asyncio.gather(*chunk_tasks)
+            d = await asyncio.gather(*chunk_tasks, return_exceptions=True)
             for results in d:
-                for result in results['accounts']:
+                if isinstance(results, Exception):
+                    continue
+                # REST版はリストを直接返す
+                for result in results:
                     users[result['id']] = self.store_user(result, try_cache=False)
         return users
 
@@ -1944,7 +1948,7 @@ class Client(rebootpy.Client):
         return f'[{self.now()}] [{self.user.display_name}] {text}'
 
     def time_party(self, text: str, name: Optional[str] = None) -> str:
-        name = user_name or (self.user.display_name if hasattr(self, "user") and self.user else "unknown")
+        name = name or (self.user.display_name if hasattr(self, "user") and self.user else "unknown")
         if getattr(self, 'party', None) is None:
             return self.time(text)
         else:
@@ -1956,7 +1960,7 @@ class Client(rebootpy.Client):
                         f'[{name}] {text}')
 
     def discord_party(self, text: str, name: Optional[str] = None) -> str:
-        name = user_name or (self.user.display_name if hasattr(self, "user") and self.user else "unknown")
+        name = name or (self.user.display_name if hasattr(self, "user") and self.user else "unknown")
         if getattr(self, 'party', None) is None:
             return self.time(text)
         else:
@@ -2688,6 +2692,20 @@ class Client(rebootpy.Client):
 
         await self.ready_init()
 
+    async def event_device_auth_generate(self, details: dict) -> None:
+        from .auth import store_device_auth_details
+        # self.userはまだない → configからemailを取る
+        email = self.config['fortnite']['email']
+        store_device_auth_details(email, details)
+        print(f'[Auth] device_auth を保存しました: {email}')
+
+    async def event_device_code_generated(self, url: str) -> None:
+        print(f'\n{"="*60}')
+        print(f'以下のURLをブラウザで開いてログインしてください:')
+        print(f'  {url}')
+        print(f'ログイン後、自動で続行されます')
+        print(f'{"="*60}\n')
+
     async def event_before_close(self) -> None:
         self._is_booting = False
         self.booted_at = None
@@ -3027,11 +3045,7 @@ class Client(rebootpy.Client):
         local = locals()
 
         async def send_messages():
-            muc_party_id = None
-            if self.xmpp.muc_room is not None:
-                muc_party_id = self.xmpp.muc_room._mucjid.localpart[len('party-'):]
-            if muc_party_id != self.party.id:
-                await self.wait_for('muc_enter', timeout=5)
+            # rebootpyではmuc_room/muc_enterが廃止されたため待機不要
 
             var = self.variables
             var.update(local)

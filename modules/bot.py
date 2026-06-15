@@ -24,7 +24,7 @@ from aiofiles import open as aopen
 from aiofiles.os import remove as aremove
 from tzlocal import get_localzone
 
-from .auth import DeviceCodeAuth
+from .auth import make_auth, store_device_auth_details
 from .auto_updater import Updater
 from .client import Client, MyClientParty, MyClientPartyMember
 from .colors import cyan, green, yellow, red
@@ -2725,7 +2725,7 @@ class Bot:
                         MyClientPartyMember.set_banner,
                         icon=config['fortnite']['banner_id'],
                         color=config['fortnite']['banner_color'],
-                        season_level=config['fortnite']['level']
+                        # season_level はrebootpyで廃止
                     ),
                     partial(
                         MyClientPartyMember.set_battlepass_info,
@@ -2751,18 +2751,7 @@ class Bot:
                     if item == 'AthenaDance':
                         section = config['fortnite'][f'{conf}_section']
 
-                auth = None
-                if self.use_device_auth and device_auth_details:
-                    auth = rebootpy.DeviceAuth(**device_auth_details)
-                elif self.use_device_auth and self.use_authorization_code:
-                    auth = rebootpy.AuthorizationCodeAuth(authorization_code(config['fortnite']['email']))
-                if auth is None:
-                    if self.use_device_code:
-                        auth = MyAdvancedAuth(refresh_token)
-                    else:
-                        auth = DeviceCodeAuth(
-                            switch_token=config['fortnite'].get('switch_token')
-                        )
+                auth = make_auth(config['fortnite']['email'])
 
                 client = Client(
                     self,

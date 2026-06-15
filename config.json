@@ -177,7 +177,7 @@
                 "prefix": null,
                 "exec": {
                     "ready": [
-                        "await client.process_command(MyMessage(self, DummyMessage(self, None, content='cid CID_028_Athena_Commando_F', author=DummyUser()))"
+                        "await client.process_command(MyMessage(self, DummyMessage(self, None, content='cid CID_028_Athena_Commando_F', author=DummyUser())))"
                     ],
                     "party_join_request": null,
                     "party_invite": null,
