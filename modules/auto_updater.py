@@ -58,7 +58,7 @@ class Updater:
             'modules/__init__.py': ['backup'],
             'modules/auth.py': ['backup'],
             'modules/auto_updater.py': ['backup'],
-            'modules/bot.py': ['backup'],
+            # 'modules/bot.py': ['backup'],
             # 'modules/client.py': ['backup'],
             'modules/colors.py': ['backup'],
             'modules/commands.py': ['backup'],

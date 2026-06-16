@@ -1428,22 +1428,24 @@ class Bot:
     def convert_variant(self, variants: list) -> list:
         if variants is None:
             return None
-        return [
-            {
-                'name': option['name'],
-                'variants': [
-                    {
-                        'c': variant['channel'],
-                        'v': (
-                            option['tag']
-                            if any([option['tag'].startswith(fmt) for fmt in self.VARIANT_FORMATS]) else
-                            f'Color.{option["tag"]}'
-                        ),
-                        'dE': 0
-                    }
-                ]
-            } for variant in variants for option in variant.get('options', [])
-        ]
+        result = []
+        for variant in variants:
+            channel = variant.get('channel', '')
+            for option in variant.get('options', []):
+                name = option.get('name') or option.get('tag') or ''
+                tag = option.get('tag') or ''
+                if not name or not tag:
+                    continue
+                v = (
+                    tag
+                    if any(tag.startswith(fmt) for fmt in self.VARIANT_FORMATS) else
+                    f'Color.{tag}'
+                )
+                result.append({
+                    'name': name,
+                    'variants': [{'c': channel, 'v': v, 'dE': 0}]
+                })
+        return result
 
     def get_item_str(self, item: dict) -> str:
         return "<Item name='{0[name]}' id='{0[id]}' path='{0[path]}'>".format(
@@ -1759,20 +1761,23 @@ class Bot:
             }
 
         elif mode == 'Fortnite-API':
-            path = data.get('path')  # ★追加（重要）
-            backend_value = data.get('type', {}).get('backendValue')
+            backend_value = data.get('type', {}).get('backendValue', '')
 
-            if not path or not backend_value:
-                return None  # ★API欠損対策
+            # ASSET_PATH_CONVERTERにないタイプはスキップ
+            if backend_value not in MyClientPartyMember.ASSET_PATH_CONVERTER:
+                return None
+
+            # IDからアセットパスを生成
+            asset_path = MyClientPartyMember.get_asset_path(backend_value, data['id'])
 
             return {
                 'id': data['id'],
-                'path': f"{backend_value}ItemDefinition'{path.replace('FortniteGame/Content', '/Game')}.{path.split('/')[-1]}'",
+                'path': asset_path,
                 'name': data['name'],
-                'url': data['images']['icon'],
+                'url': (data.get('images') or {}).get('icon') or (data.get('images') or {}).get('smallIcon') or '',
                 'type': data['type'],
                 'set': data['set']['value'] if data.get('set') else None,
-                'variants': self.convert_variant(data['variants'])
+                'variants': self.convert_variant(data.get('variants') or [])
             }
 
         elif mode == 'FortniteApi.io':
@@ -1807,16 +1812,37 @@ class Bot:
             'AthenaToy'
         ]
 
-        items = [
-            self.format_item(item, mode)
-            for item in sorted(data, key=lambda x: x['id'])
-        ]
+        if not data:
+            self.send(f'[ItemData] format_items: dataが空です (mode={mode})', add_p=self.time)
+            return []
 
-        return [
+        items = []
+        for item in sorted(data, key=lambda x: x['id']):
+            try:
+                formatted = self.format_item(item, mode)
+                items.append(formatted)
+            except Exception as e:
+                pass  # 個別エラーはスキップ
+
+        # デバッグ: 最初の5件のtype.backendValueを表示
+        non_none = [i for i in items if i is not None]
+        if non_none:
+            sample_types = list(set(i.get('type', {}).get('backendValue', 'N/A') for i in non_none[:50]))
+            self.send(f'[ItemData DEBUG] backendValueサンプル: {sample_types[:10]}', add_p=self.time)
+        else:
+            self.send(f'[ItemData DEBUG] format_item全件None (総数{len(items)})', add_p=self.time)
+            # 最初の生データのtypeを確認
+            sample_raw = sorted(data, key=lambda x: x['id'])[:3]
+            for s in sample_raw:
+                self.send(f'[ItemData DEBUG] raw type={s.get("type")} id={s.get("id")}', add_p=self.time)
+
+        result = [
             item
             for item in items
             if item and item.get('type', {}).get('backendValue') in types
         ]
+        self.send(f'[ItemData] format後: {len(result)}件 / 全{len(items)}件フォーマット済み', add_p=self.time)
+        return result
 
     async def get_item_data(self, lang: str) -> list:
         if self.config['api'] == 'BenBot':
@@ -1854,6 +1880,7 @@ class Bot:
         else:
             items = {'api': None, 'items': CaseInsensitiveDict()}
         data = await self.get_item_data(lang)
+        self.send(f'[ItemData] 取得件数: {len(data) if data else 0} ({lang})', add_p=self.time)
         if self.config['api'] == 'FortniteApi.io':
             for item in data:
                 i = items['items'].get(item['id'])
@@ -2107,6 +2134,9 @@ class Bot:
             else:
                 if items['api'] != self.config['api']:
                     flag = True
+                elif not items.get('items'):
+                    # itemsが空の場合は強制再取得
+                    flag = True
                 else:
                     flag = self.is_not_edited_for(
                         f"{self.item_dir}/items_{self.config['search_lang']}",
@@ -2127,6 +2157,9 @@ class Bot:
                 flag = True
             else:
                 if items['api'] != self.config['api']:
+                    flag = True
+                elif not items.get('items'):
+                    # itemsが空の場合は強制再取得
                     flag = True
                 else:
                     flag = self.is_not_edited_for(
@@ -2573,7 +2606,7 @@ class Bot:
             )
 
         if self.config['check_update_on_startup']:
-            if await self.updater.check_updates(self.dev):
+            if False and await self.updater.check_updates(self.dev):  # 自動更新無効化
                 await self.reboot()
                 sys.exit(0)
 
@@ -2725,7 +2758,6 @@ class Bot:
                         MyClientPartyMember.set_banner,
                         icon=config['fortnite']['banner_id'],
                         color=config['fortnite']['banner_color'],
-                        # season_level はrebootpyで廃止
                     ),
                     partial(
                         MyClientPartyMember.set_battlepass_info,
@@ -2751,7 +2783,13 @@ class Bot:
                     if item == 'AthenaDance':
                         section = config['fortnite'][f'{conf}_section']
 
-                auth = make_auth(config['fortnite']['email'])
+                auth = None
+                if self.use_device_auth and device_auth_details:
+                    auth = rebootpy.DeviceAuth(**device_auth_details)
+                elif self.use_device_auth and self.use_authorization_code:
+                    auth = rebootpy.AuthorizationCodeAuth(authorization_code(config['fortnite']['email']))
+                if auth is None:
+                    auth = make_auth(config['fortnite']['email'])
 
                 client = Client(
                     self,

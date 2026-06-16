@@ -83,13 +83,19 @@ class LoginManager:
             
     def login_required(self, func: Callable) -> Callable:
         @wraps(func)
-        def deco(request: Request, *args: Any, **kwargs: Any):
+        async def deco(request: Request, *args: Any, **kwargs: Any):
             if self.ignore(request) or self.authenticated(request):
-                return func(request, *args, **kwargs)
+                ret = func(request, *args, **kwargs)
+                if asyncio.iscoroutine(ret):
+                    return await ret
+                return ret
             elif isinstance(self.unauthorized_handler_, HTTPResponse):
                 return self.unauthorized_handler_
             elif callable(self.unauthorized_handler_):
-                return self.unauthorized_handler_(request, *args, **kwargs)
+                ret = self.unauthorized_handler_(request, *args, **kwargs)
+                if asyncio.iscoroutine(ret):
+                    return await ret
+                return ret
         return deco
 
     def unauthorized_handler(self, func: Callable) -> Callable:
@@ -758,7 +764,7 @@ def client_variables(client: 'Client', full: Optional[bool] = False) -> dict:
                     if client.searcher.get_item(client.asset('AthenaDance', member)) is not None else
                     None,
                     'banner': client.bot.get_banner_url(member.banner[0]),
-                    'level': member.banner[2]
+                    'level': 0  # rebootpyではbanner levelは取得不可
                 } for member in getattr(party, 'members', [])
             ],
             'client_party_member': {
@@ -819,7 +825,7 @@ def client_variables(client: 'Client', full: Optional[bool] = False) -> dict:
                 if client.searcher.get_item(client.asset('AthenaDance', party.me)) is not None else
                 None,
                 'banner': client.bot.get_banner_url(party.me.banner[0]),
-                'level': party.me.banner[2]
+                'level': 0  # rebootpyではbanner levelは取得不可
             } if party is not None else None,
             'whisper': client.whisper,
             'party_chat': (

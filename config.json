@@ -5,7 +5,7 @@
                 "email": "takeshi@gmail.com",
                 "nickname": null,
                 "owner": null,
-                "outfit": "<Item name='Renegade Raider' id='CID_028_Athena_Commando_F' path='AthenaCharacterItemDefinition'/Game/Athena/Items/Cosmetics/Characters/CID_028_Athena_Commando_F.CID_028_Athena_Commando_F''>",
+                "outfit": "<Item name='レネゲードレイダー' id='CID_028_Athena_Commando_F' path=''>",
                 "outfit_style": null,
                 "ng_outfits": null,
                 "ng_outfit_for": [
@@ -87,7 +87,7 @@
                 "refresh_on_reload": false,
                 "party": {
                     "privacy": "PUBLIC",
-                    "max_size": 4,
+                    "max_size": 16,
                     "allow_swap": true,
                     "playlist": "<Playlist name='VK Play' id='Playlist_VK_Play'>",
                     "disable_voice_chat": false
@@ -274,7 +274,9 @@
         "login_required": false,
         "command_web": true,
         "access_log": false,
-        "prefix": null
+        "prefix": [
+            "!"
+        ]
     },
     "check_update_on_startup": true,
     "restart_in": 0,
@@ -292,7 +294,7 @@
     "hide_webhook": true,
     "hide_weburl": true,
     "no_logs": false,
-    "loglevel": "normal",
+    "loglevel": "info",
     "debug": false,
     "status": 1
 }

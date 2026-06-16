@@ -115,9 +115,7 @@ class MyClientPartyMember(rebootpy.ClientPartyMember):
                             keep: Optional[bool] = True,
                             do_point: Optional[bool] = True, **kwargs: Any) -> bool:
 
-        asset = self.get_asset_path(item, asset)
-
-        # ★安全ガード
+        # rebootpyはIDをそのまま受け取るためget_asset_pathは不要
         if item == 'AthenaPickaxe' and not asset:
             asset = 'DefaultPickaxe'
 
@@ -134,9 +132,7 @@ class MyClientPartyMember(rebootpy.ClientPartyMember):
         kwargs['section'] = kwargs.get('section')
 
         func = self.ASSET_FUNCTION_CONVERTER[item]
-
-        if asset and '.' not in asset:
-            asset = f"AthenaCharacter:{asset}"
+        # rebootpyはID直渡しで動くので "AthenaCharacter:CID_xxx" 形式は不要
 
         # =========================
         # Outfit / Backpack系
@@ -703,8 +699,8 @@ class Client(rebootpy.Client):
                                 return
                     except AttributeError:
                         pass
-            # GraphQL版(404エラー)からREST版に変更
-            task = self.http.account_get_by_display_name(dn)
+
+            task = self.http.account_graphql_get_by_display_name(elem)
             tasks.append(task)
 
         for elem in users:
@@ -722,28 +718,29 @@ class Client(rebootpy.Client):
                 new.append(elem)
 
         if len(tasks) > 0:
-            pfs = await asyncio.gather(*tasks, return_exceptions=True)
+            pfs = await asyncio.gather(*tasks)
             for p_data in pfs:
-                if isinstance(p_data, Exception):
-                    continue
-                # REST版は単一dictを返す: {'id': ..., 'displayName': ...}
-                if 'id' in p_data:
-                    new.append(p_data['id'])
+                accounts = p_data['account']
+                for account_data in accounts:
+                    if account_data['displayName'] is not None:
+                        new.append(account_data['id'])
+                        break
+                else:
+                    for account_data in accounts:
+                        if account_data['displayName'] is None:
+                            new.append(account_data['id'])
+                            break
 
         chunk_tasks = []
         chunks = [new[i:i + 100] for i in range(0, len(new), 100)]
         for chunk in chunks:
-            # GraphQL版(404エラー)からREST版に変更
-            task = self.http.account_get_multiple_by_user_id(chunk)
+            task = self.http.account_graphql_get_multiple_by_user_id(chunk)
             chunk_tasks.append(task)
 
         if len(chunks) > 0:
-            d = await asyncio.gather(*chunk_tasks, return_exceptions=True)
+            d = await asyncio.gather(*chunk_tasks)
             for results in d:
-                if isinstance(results, Exception):
-                    continue
-                # REST版はリストを直接返す
-                for result in results:
+                for result in results['accounts']:
                     if raw:
                         _users.append(result)
                     else:
@@ -758,18 +755,14 @@ class Client(rebootpy.Client):
         chunk_tasks = []
         chunks = [user_ids[i:i + 100] for i in range(0, len(user_ids), 100)]
         for chunk in chunks:
-            # GraphQL版(404エラー)からREST版に変更
-            task = self.http.account_get_multiple_by_user_id(chunk)
+            task = self.http.account_graphql_get_multiple_by_user_id(chunk)
             chunk_tasks.append(task)
 
         users = {}
         if len(chunks) > 0:
-            d = await asyncio.gather(*chunk_tasks, return_exceptions=True)
+            d = await asyncio.gather(*chunk_tasks)
             for results in d:
-                if isinstance(results, Exception):
-                    continue
-                # REST版はリストを直接返す
-                for result in results:
+                for result in results['accounts']:
                     users[result['id']] = self.store_user(result, try_cache=False)
         return users
 
@@ -1960,7 +1953,7 @@ class Client(rebootpy.Client):
                         f'[{name}] {text}')
 
     def discord_party(self, text: str, name: Optional[str] = None) -> str:
-        name = name or (self.user.display_name if hasattr(self, "user") and self.user else "unknown")
+        name = user_name or (self.user.display_name if hasattr(self, "user") and self.user else "unknown")
         if getattr(self, 'party', None) is None:
             return self.time(text)
         else:
@@ -3045,7 +3038,11 @@ class Client(rebootpy.Client):
         local = locals()
 
         async def send_messages():
-            # rebootpyではmuc_room/muc_enterが廃止されたため待機不要
+            muc_party_id = None
+            if self.xmpp.muc_room is not None:
+                muc_party_id = self.xmpp.muc_room._mucjid.localpart[len('party-'):]
+            if muc_party_id != self.party.id:
+                await self.wait_for('muc_enter', timeout=5)
 
             var = self.variables
             var.update(local)
