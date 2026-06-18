@@ -327,48 +327,9 @@ class Updater:
             return False, latest
 
     async def check_updates(self, dev: Optional[bool] = False) -> bool:
-        if dev:
-            uri = 'https://raw.githubusercontent.com/Huguitis/FortniteLobbyBotEgg/dev/'
-        else:
-            uri = 'https://raw.githubusercontent.com/Huguitis/FortniteLobbyBotEgg/main/'
-
-        _, data = await self.check_update(uri, 'modules/auto_updater.py', write=False)
-
-        var = {}
-        exec(data, globals(), var)
-        if version.parse(__version__) < version.parse(var['__version__']):
-            self.bot.send(
-                self.l(
-                    'new_version',
-                    var['__version__'],
-                    default=(
-                        "Update detected. Version: {0} | PLEASE WAIT, THIS CAN TAKE UP TO 5 MINUTES"
-                    )
-                ),
-                add_p=self.bot.time
-            )
-            await var['Updater'](self.bot).update(uri)
-            self.bot.send(
-                self.l(
-                    'update_finish',
-                    var['__version__'],
-                    default=(
-                        "Successfully updated to version {0}"
-                    )
-                ),
-                add_p=[self.bot.time, lambda x: f'\n{x}']
-            )
-            return True
+        # 自動更新を無効化（rebootpy対応版の修正が上書きされるため）
         return False
 
     async def update(self, uri: str) -> None:
-        tasks = [
-            self.bot.loop.create_task(self.check_update(uri, path))
-            for path in self.updates.keys()
-        ]
-        if self.bot.mode == 'pc':
-            tasks.extend([
-                self.bot.loop.create_task(self.check_update(uri, path))
-                for path in self.pc_updates.keys()
-            ])
-        await asyncio.wait(tasks)
+        # 自動更新を無効化（rebootpy対応版の修正が上書きされるため）
+        pass

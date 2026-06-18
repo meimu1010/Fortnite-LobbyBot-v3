@@ -447,6 +447,12 @@ async def cosmetic_search(item: Optional[str], mode: str, command: Command,
             )
             return
         await client.party.me.change_asset(item, cosmetic['path'])
+
+        # 起動時にも反映されるようconfigに保存（文字列形式で保存）
+        conf_key = client.bot.convert_backend_type(item)
+        client.config['fortnite'][conf_key] = client.bot.get_item_str(cosmetic)
+        client.bot.save_json('config', client.bot.config)
+
         await message.reply(
             client.l(
                 'set_to',
@@ -3020,7 +3026,14 @@ class DefaultCommands:
         usage='{name} [{client.l("message")}]'
     )
     async def status(command: Command, client: 'Client', message: MyMessage) -> None:
-        await client.set_presence(' '.join(message.args[1:]))
+        client.set_presence(' '.join(message.args[1:]))
+        pt = getattr(client.xmpp, '_presence_task', None)
+        if pt is not None:
+            print(f'[FORCE_DEBUG4] (statuscmd) presence_task done={pt.done()} cancelled={pt.cancelled()}')
+            if pt.done() and not pt.cancelled():
+                print(f'[FORCE_DEBUG4] (statuscmd) presence_task exception={pt.exception()!r}')
+        else:
+            print('[FORCE_DEBUG4] (statuscmd) presence_task not found')
         await message.reply(
             client.l(
                 'set_to',
@@ -3042,7 +3055,6 @@ class DefaultCommands:
             client.party.me.set_banner,
             icon=message.args[1],
             color=message.args[2],
-            season_level=client.party.me.banner[2]
         ))
         await message.reply(
             client.l(
@@ -3051,6 +3063,8 @@ class DefaultCommands:
                 f'{message.args[1]}, {message.args[2]}'
             )
         )
+
+    # levelコマンドは廃止（tierに統合、起動時のbattlepass levelで設定）
 
     @command(
         name='level',
@@ -3061,28 +3075,28 @@ class DefaultCommands:
             await client.show_help(command, message)
             return
 
-        icon, color = client.party.me.banner[:2]
         try:
-            level = int(message.args[1])
+            tier_value = int(message.args[1])
         except ValueError as e:
             client.debug_print_exception(e)
             await message.reply(
                 client.l('please_enter_valid_value')
             )
             return
-        await client.party.me.edit_and_keep(partial(
-            client.party.me.set_banner,
-            icon=icon,
-            color=color,
-            season_level=level
-        ))
+        await client.party.me.set_battlepass_info(
+            has_purchased=True,
+            level=tier_value,
+        )
+        client.config['fortnite']['tier'] = tier_value
+        client.bot.save_json('config', client.bot.config)
         await message.reply(
             client.l(
                 'set_to',
                 client.l('level'),
-                level
+                tier_value
             )
         )
+
 
     @command(
         name='battlepass',
@@ -3158,60 +3172,8 @@ class DefaultCommands:
                 )
             )
 
-    @command(
-        name='voice_chat',
-        usage=(
-            '{name} [{client.l("bool", **self.variables_without_self)}]\n'
-            '{client.l("current_setting", client.l("enabled") '
-            'if client.party.voice_chat_enabled else '
-            'client.l("disabled"))}'
-        )
-    )
-    async def voice_chat(command: Command, client: 'Client', message: MyMessage) -> None:
-        if len(message.args) < 2:
-            await client.show_help(command, message)
-            return
+    # voice_chatコマンドは廃止（rebootpyでvoice_chat関連機能が削除されたため）
 
-        if not client.party.me.leader:
-            await message.reply(
-                client.l('not_a_party_leader')
-            )
-            return
-
-        if message.args[1] in client.commands['true']:
-            try:
-                await client.party.enable_voice_chat()
-            except rebootpy.Forbidden as e:
-                client.debug_print_exception(e)
-                await message.reply(
-                    client.l('not_a_party_leader')
-                )
-                return
-            await message.reply(
-                client.l(
-                    'set_to',
-                    client.l('voice_chat'),
-                    client.l('enabled')
-                )
-            )
-        elif message.args[1] in client.commands['false']:
-            try:
-                await client.party.disable_voice_chat()
-            except rebootpy.Forbidden as e:
-                client.debug_print_exception(e)
-                await message.reply(
-                    client.l('not_a_party_leader')
-                )
-                return
-            await message.reply(
-                client.l(
-                    'set_to',
-                    client.l('voice_chat'),
-                    client.l('disabled')
-                )
-            )
-        else:
-            await client.show_help(command, message)
 
     @command(
         name='promote',
@@ -3361,97 +3323,8 @@ class DefaultCommands:
                     + '\n' + client.l('enter_number_to_select', client.l('user')))
             )
 
-    @command(
-        name='chatban',
-        usage='{name} [{client.l("name_or_id")}] : ({client.l("reason")})'
-    )
-    async def chatban(command: Command, client: 'Client', message: MyMessage) -> None:
-        if len(message.args) < 2:
-            await client.show_help(command, message)
-            return
+    # chatbanコマンドは廃止
 
-        if not client.party.me.leader:
-            await message.reply(
-                client.l('not_a_party_leader')
-            )
-            return
-
-        text = ' '.join(message.args[1:]).split(' : ')
-
-        if len(text) == 1:
-            user_name = text[0]
-            reason = None
-        else:
-            user_name, *reason = text
-            reason = ' '.join(reason)
-
-        users = client.find_users(
-            user_name,
-            mode=FindUserMode.NAME_ID,
-            method=FindUserMatchMethod.CONTAINS,
-            users=client.party.members,
-            me=message.author
-        )
-
-        async def chatban(user):
-            member = client.party.get_member(user.id)
-            if member is None:
-                await message.reply(
-                    client.l(
-                        'not_in_party',
-                        client.name(user)
-                    )
-                )
-                return
-
-            ret = await client.chatban_member(member, reason, message)
-            if not isinstance(ret, Exception):
-                if reason is None:
-                    await message.reply(
-                        client.l(
-                            'chatban',
-                            client.name(member)
-                        )
-                    )
-                else:
-                    await message.reply(
-                        client.l(
-                            'chatban_reason',
-                            client.name(member),
-                            reason
-                        )
-                    )
-
-        if client.config['search_max'] and len(users) > client.config['search_max']:
-            await message.reply(
-                client.l('too_many', client.l('user'), len(users))
-            )
-            return
-
-        if len(users) == 0:
-            await message.reply(
-                client.l(
-                    'not_found',
-                    client.l('user'),
-                    user_name
-                )
-            )
-        elif len(users) == 1:
-            await chatban(users[0])
-        else:
-            client.select[message.author.id] = {
-                'exec': 'await chatban(user)',
-                'globals': {**globals(), **locals()},
-                'variables': [
-                    {'user': user}
-                    for user in users
-                ]
-            }
-            await message.reply(
-                ('\n'.join([f'{num}: {client.name(user)}'
-                            for num, user in enumerate(users, 1)])
-                    + '\n' + client.l('enter_number_to_select', client.l('user')))
-            )
 
     @command(
         name='hide',
@@ -3695,32 +3568,16 @@ class DefaultCommands:
 
     @command(
         name='match',
-        usage='{name} ({client.l("number")})'
+        usage='{name}'
     )
     async def match(command: Command, client: 'Client', message: MyMessage) -> None:
-        if len(message.args) < 2:
-            players_left = 100
-        else:
-            try:
-                players_left = int(message.args[1])
-            except ValueError as e:
-                client.debug_print_exception(e)
-                await message.reply(
-                    client.l('please_enter_valid_number')
-                )
-                return
-
-        await client.party.me.set_in_match(
-            players_left=players_left
-        )
+        # rebootpyのset_in_matchはplayers_left等の引数を受け付けない
+        await client.party.me.set_in_match()
         await message.reply(
             client.l(
                 'set_to',
                 client.l('match_state'),
-                client.l(
-                    'players_left',
-                    players_left
-                )
+                client.l('match_state')
             )
         )
 
@@ -4303,30 +4160,14 @@ class DefaultCommands:
             await client.show_help(command, message)
             return
 
-        meta = client.party.me.meta
-        data = (meta.get_prop('Default:AthenaCosmeticLoadout_j'))['AthenaCosmeticLoadout']
-        try:
-            data['cosmeticStats'][1]['statValue'] = crowns_count
-        except KeyError:
-            data['cosmeticStats'] = [
-                {
-                    "statName": "TotalVictoryCrowns",
-                    "statValue": 0
-                },
-                {
-                    "statName": "TotalRoyalRoyales",
-                    "statValue": crowns_count
-                },
-                {
-                    "statName": "HasCrown",
-                    "statValue": 0
-                }
-            ]
-        final = {'AthenaCosmeticLoadout': data}
-        key = 'Default:AthenaCosmeticLoadout_j'
-        prop = {key: meta.set_prop(key, final)}
-
-        await client.party.me.patch(updated=prop)
+        # 'Crowning Achievement'バナー表示にはhas_crownも必要だが
+        # set_victory_crownsはvictory_crownsのみ設定するコルーチン関数
+        await client.party.me.edit_and_keep(
+            partial(
+                client.party.me.set_victory_crowns,
+                crowns_count
+            )
+        )
 
         await client.party.me.clear_emote()
 
@@ -4354,17 +4195,10 @@ class DefaultCommands:
                 client.l('not_a_party_leader')
             )
             return
-        meta = client.party.meta
-        data = (meta.get_prop('Default:PlaylistData_j'))['PlaylistData']
-        data['playlistName'] = 'Playlist_PlaygroundV2'
-        data['mnemonic'] = message.args[1]
-
-        final = {'PlaylistData': data}
-        key = 'Default:PlaylistData_j'
-        prop = {key: meta.set_prop(key, final)}
 
         try:
-            await client.party.patch(updated=prop)
+            # rebootpyではアイランドコードを直接set_playlistに渡せる
+            await client.party.set_playlist(playlist=message.args[1])
         except rebootpy.Forbidden:
             await message.reply(
                 client.l('not_a_party_leader')

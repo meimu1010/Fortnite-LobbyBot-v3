@@ -853,6 +853,14 @@ socket.addEventListener('message', function(ev) {
         const pre = document.createElement('pre');
         pre.innerText = client.response;
         res.appendChild(pre);
+
+        res.style.color = '';
+        res.style.transform = 'translateX(-50%) translateY(0%)';
+        res.ontransitionend = function () {
+            setTimeout(function () {
+                res.style.transform = 'translateX(-50%) translateY(-200px)';
+            }, 1500);
+        }
     }
 
     if (client.type == 'full' || client.type == 'diff') {

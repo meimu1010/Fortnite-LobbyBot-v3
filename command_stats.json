@@ -2,7 +2,30 @@
     "30f84519f0b4449299b9e1710ca88524": {
         "commands": {
             "Dummy": {
-                "cid": 10
+                "cid": 26
+            },
+            "57adb5f3750f43659a63d31a8030c36e": {
+                "level": 1,
+                "add_friend": 1,
+                "emote": 2
+            },
+            "WebUser": {
+                "add_friend": 5,
+                "invite": 6,
+                "message": 3,
+                "level": 8,
+                "hide": 1,
+                "show": 1,
+                "promote": 1,
+                "ready": 1,
+                "sitout": 1,
+                "unready": 1,
+                "match": 3,
+                "swap": 1,
+                "emote": 1,
+                "set": 2,
+                "island_code": 1,
+                "status": 5
             }
         },
         "ngs": {}

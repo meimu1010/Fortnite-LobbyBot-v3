@@ -19,6 +19,17 @@ from sanic import response as res
 from sanic.request import Request
 from sanic.response import HTTPResponse
 from websockets.exceptions import ConnectionClosedOK
+try:
+    from sanic.exceptions import WebsocketClosed as _SanicWsClosed
+except ImportError:
+    _SanicWsClosed = None
+
+def _ws_closed(e):
+    if isinstance(e, ConnectionClosedOK):
+        return True
+    if _SanicWsClosed is not None and isinstance(e, _SanicWsClosed):
+        return True
+    return False
 
 if version.parse(sanic.__version__) >= version.parse('21.9.0'):
     from sanic.server.websockets.connection import WebSocketConnection
@@ -645,6 +656,14 @@ async def boot_switch_restart(request: Request) -> HTTPResponse:
     return res.empty()
 
 
+def _safe_position(member) -> int:
+    """squad_assignmentsに未登録の場合のKeyErrorを防ぐ"""
+    try:
+        return member.position
+    except KeyError:
+        return -1
+
+
 def client_variables(client: 'Client', full: Optional[bool] = False) -> dict:
     if full:
         app = client.bot.web
@@ -709,7 +728,7 @@ def client_variables(client: 'Client', full: Optional[bool] = False) -> dict:
                     'name': client.name(member, force_info=True),
                     'display_name': member.display_name,
                     'id': member.id,
-                    'position': member.position,
+                    'position': _safe_position(member),
                     'is_leader': member.leader,
                     'is_incoming_pending': client.is_incoming_pending(member.id),
                     'is_outgoing_pending': client.is_outgoing_pending(member.id),
@@ -764,13 +783,13 @@ def client_variables(client: 'Client', full: Optional[bool] = False) -> dict:
                     if client.searcher.get_item(client.asset('AthenaDance', member)) is not None else
                     None,
                     'banner': client.bot.get_banner_url(member.banner[0]),
-                    'level': 0  # rebootpyではbanner levelは取得不可
+                    'level': member.battlepass_info[1]
                 } for member in getattr(party, 'members', [])
             ],
             'client_party_member': {
                 'name': client.name(party.me, force_info=True),
                 'id': party.me.id,
-                'position': party.me.position,
+                'position': _safe_position(party.me),
                 'is_leader': party.me.leader,
                 'is_incoming_pending': client.is_incoming_pending(party.me.id),
                 'is_outgoing_pending': client.is_outgoing_pending(party.me.id),
@@ -825,7 +844,7 @@ def client_variables(client: 'Client', full: Optional[bool] = False) -> dict:
                 if client.searcher.get_item(client.asset('AthenaDance', party.me)) is not None else
                 None,
                 'banner': client.bot.get_banner_url(party.me.banner[0]),
-                'level': 0  # rebootpyではbanner levelは取得不可
+                'level': party.me.battlepass_info[1]
             } if party is not None else None,
             'whisper': client.whisper,
             'party_chat': (
@@ -882,7 +901,8 @@ async def websocket_sender(request: Request, ws: WebSocketConnection,
                 var = new_var
                 try:
                     await ws.send(var)
-                except ConnectionClosedOK:
+                except Exception as _e:
+                    if not _ws_closed(_e): raise
                     break
 
     loop = app.ctx.loop
@@ -1016,7 +1036,7 @@ async def websocket_sender_client(request: Request, ws: WebSocketConnection,
                 await ws.send(json.dumps(data))
             except Exception as e:
                 client.remove_event_handler('store_whisper', store_whisper)
-                if e.__class__ is not ConnectionClosedOK:
+                if not _ws_closed(e):
                     raise
 
         client.add_event_handler('store_whisper', store_whisper)
@@ -1030,7 +1050,7 @@ async def websocket_sender_client(request: Request, ws: WebSocketConnection,
                 await ws.send(json.dumps(data))
             except Exception as e:
                 client.remove_event_handler('store_party_chat', store_party_chat)
-                if e.__class__ is not ConnectionClosedOK:
+                if not _ws_closed(e):
                     raise
 
         client.add_event_handler('store_party_chat', store_party_chat)
@@ -1043,7 +1063,7 @@ async def websocket_sender_client(request: Request, ws: WebSocketConnection,
                 await ws.send(json.dumps(data))
             except Exception as e:
                 client.remove_event_handler('clear_party_chat', clear_party_chat)
-                if e.__class__ is not ConnectionClosedOK:
+                if not _ws_closed(e):
                     raise
 
         client.add_event_handler('clear_party_chat', clear_party_chat)
@@ -1057,7 +1077,8 @@ async def websocket_sender_client(request: Request, ws: WebSocketConnection,
                 client.cached_var = new_var
                 try:
                     await ws.send(json.dumps(diff))
-                except ConnectionClosedOK:
+                except Exception as _e:
+                    if not _ws_closed(_e): raise
                     break
 
     loop = app.ctx.loop
@@ -1236,7 +1257,8 @@ async def clients_viewer_client_ws(request: Request, ws: WebSocketConnection, nu
                 user_name=client.name(message.author),
                 add_p=[lambda x: f'{client.name(message.author)} | {x}', client.time]
             )
-            await client.process_command(message, client.bot.config['web']['prefix'])
+            # WebUIからのコマンドはprefix不要（入力フォーム自体がコマンド専用のため）
+            await client.process_command(message, None)
             await ws.send(json.dumps({
                 'type': 'response',
                 'response': mes.result
@@ -1270,7 +1292,8 @@ async def clients_viewer_client_ws(request: Request, ws: WebSocketConnection, nu
                 client.cached_var = after_var
                 try:
                     await ws.send(json.dumps(diff))
-                except ConnectionClosedOK:
+                except Exception as _e:
+                    if not _ws_closed(_e): raise
                     break
 
 

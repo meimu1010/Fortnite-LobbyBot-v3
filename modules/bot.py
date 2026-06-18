@@ -209,7 +209,7 @@ class Bot:
                 'value': i,
                 'display_value': self.l(f'platform_{i}', default=i)
             } for i in ['WIN', 'MAC', 'PSN', 'PS5', 'XBL',
-                        'XBX', 'XBS', 'SWT', 'IOS', 'AND']
+                        'XBX', 'XBS', 'SWT', 'SWT2', 'IOS', 'AND']
         ]
         self.select_privacy = [
             {
@@ -403,10 +403,8 @@ class Bot:
             "['fortnite']['party']['max_size']": [int, 'lambda x: 1 <= x <= 16'],
             "['fortnite']['party']['allow_swap']": [bool, 'select_bool'],
             "['fortnite']['party']['playlist']": [str],
-            "['fortnite']['party']['disable_voice_chat']": [bool, 'select_bool'],
             "['fortnite']['banner_id']": [str],
             "['fortnite']['banner_color']": [str],
-            "['fortnite']['level']": [int],
             "['fortnite']['tier']": [int],
             "['fortnite']['platform']": [str, 'select_platform'],
             "['fortnite']['ng_platforms']": [list, str, 'multiple_select_platform', 'can_be_none'],
@@ -1763,16 +1761,19 @@ class Bot:
         elif mode == 'Fortnite-API':
             backend_value = data.get('type', {}).get('backendValue', '')
 
-            # ASSET_PATH_CONVERTERにないタイプはスキップ
-            if backend_value not in MyClientPartyMember.ASSET_PATH_CONVERTER:
+            # 対応タイプ以外はスキップ
+            supported = [
+                'AthenaCharacter', 'AthenaBackpack', 'AthenaPet',
+                'AthenaPetCarrier', 'AthenaPickaxe', 'AthenaDance',
+                'AthenaEmoji', 'AthenaToy', 'AthenaConsumableEmote'
+            ]
+            if backend_value not in supported:
                 return None
 
-            # IDからアセットパスを生成
-            asset_path = MyClientPartyMember.get_asset_path(backend_value, data['id'])
-
+            # rebootpyはIDだけで動くのでIDをpathとして使用
             return {
                 'id': data['id'],
-                'path': asset_path,
+                'path': data['id'],
                 'name': data['name'],
                 'url': (data.get('images') or {}).get('icon') or (data.get('images') or {}).get('smallIcon') or '',
                 'type': data['type'],
@@ -2517,9 +2518,9 @@ class Bot:
         if self.server is not None:
             await self.server.close()
 
-        coros = {client.wait_until_ready() for client in self.clients}
-        if coros:
-            await asyncio.wait(coros)
+        tasks = {asyncio.ensure_future(client.wait_until_ready()) for client in self.clients}
+        if tasks:
+            await asyncio.wait(tasks)
         await rebootpy.close_multiple(
             [client for client in self.clients if client.is_ready() or client.is_booting()]
         )
@@ -2748,10 +2749,7 @@ class Bot:
                         playlist=(self.get_config_playlist_id(config['fortnite']['party']['playlist'])
                                   or config['fortnite']['party']['playlist'])
                     ))
-                if config['fortnite']['party']['disable_voice_chat']:
-                    party_meta.append(partial(
-                        MyClientParty.disable_voice_chat
-                    ))
+                # rebootpyではvoice_chat関連機能が廃止されたため削除済み
 
                 member_meta = [
                     partial(
@@ -2765,23 +2763,7 @@ class Bot:
                         level=config['fortnite']['tier']
                     )
                 ]
-                items = [
-                    'AthenaCharacter',
-                    'AthenaBackpack',
-                    'AthenaPickaxe',
-                    'AthenaDance'
-                ]
-                for item in items:
-                    conf = self.convert_backend_type(item)
-                    variants = []
-                    if item != 'AthenaDance' and config['fortnite'][f'{conf}_style'] is not None:
-                        for style in config['fortnite'][f'{conf}_style']:
-                            variant = self.get_config_variant(style)
-                            if variant is not None:
-                                variants.extend(variant['variants'])
-                    section = 0
-                    if item == 'AthenaDance':
-                        section = config['fortnite'][f'{conf}_section']
+                # outfit/backpack/pickaxe/emoteはevent_ready内のapply_config_cosmeticsで反映
 
                 auth = None
                 if self.use_device_auth and device_auth_details:

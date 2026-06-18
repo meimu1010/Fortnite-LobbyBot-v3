@@ -50,7 +50,8 @@
         "petid_",
         "eid_",
         "emoji_",
-        "toy_"
+        "toy_",
+        "add_friend"
     ],
     "prefix_to_item_search": false,
     "command": [
@@ -423,26 +424,17 @@
         "banner": [
             "banner"
         ],
-        "level": [
-            "level"
-        ],
         "battlepass": [
             "battlepass"
         ],
         "privacy": [
             "privacy"
         ],
-        "voice_chat": [
-            "voice_chat"
-        ],
         "promote": [
             "promote"
         ],
         "kick": [
             "kick"
-        ],
-        "chatban": [
-            "chatban"
         ],
         "hide": [
             "hide"
@@ -620,6 +612,9 @@
         ],
         "cosmetic_preset": [
             "cosmetic_preset"
+        ],
+        "level": [
+            "level"
         ]
     },
     "status": 1

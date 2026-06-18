@@ -248,13 +248,6 @@ class MyClientParty(rebootpy.ClientParty):
         self._hides = []
         self.party_chat = []
 
-    @property
-    def voice_chat_enabled(self) -> bool:
-        return self.meta.get_prop('VoiceChat:implementation_s') in [
-            'VivoxVoiceChat',
-            'EOSVoiceChat'
-        ]
-
     def update_hide_users(self, user_ids: List[str]) -> None:
         self._hides = user_ids
 
@@ -301,21 +294,7 @@ class MyClientParty(rebootpy.ClientParty):
 
         return results
 
-    async def disable_voice_chat(self) -> None:
-        if self.me is not None and not self.me.leader:
-            raise rebootpy.Forbidden('You have to be leader for this action to work.')
-
-        prop = self.meta.set_voicechat_implementation('None')
-        if not self.edit_lock.locked():
-            await self.patch(updated=prop)
-
-    async def enable_voice_chat(self) -> None:
-        if self.me is not None and not self.me.leader:
-            raise rebootpy.Forbidden('You have to be leader for this action to work.')
-
-        prop = self.meta.set_voicechat_implementation('EOSVoiceChat')
-        if not self.edit_lock.locked():
-            await self.patch(updated=prop)
+    # rebootpyではvoice_chat関連メソッドが廃止されたため削除済み
 
     def construct_presence(self, text: Optional[str] = None) -> dict:
         perm = self.config['privacy']['presencePermission']
@@ -413,6 +392,7 @@ class Client(rebootpy.Client):
         rebootpy.Platform.XBOX_ONE: "Xbox One",
         rebootpy.Platform.XBOX_X: "Xbox Series X",
         rebootpy.Platform.SWITCH: "Switch",
+        rebootpy.Platform.SWITCH_2: "Switch 2",
         rebootpy.Platform.IOS: "IOS",
         rebootpy.Platform.ANDROID: "Android"
     }
@@ -682,6 +662,7 @@ class Client(rebootpy.Client):
     async def fetch_users(self, users, *,
                           cache: bool = False,
                           raw: bool = False) -> List[rebootpy.User]:
+        users = list(users)
         if len(users) == 0:
             return []
 
@@ -700,7 +681,7 @@ class Client(rebootpy.Client):
                     except AttributeError:
                         pass
 
-            task = self.http.account_graphql_get_by_display_name(elem)
+            task = self.http.account_get_by_display_name(dn)
             tasks.append(task)
 
         for elem in users:
@@ -718,29 +699,28 @@ class Client(rebootpy.Client):
                 new.append(elem)
 
         if len(tasks) > 0:
-            pfs = await asyncio.gather(*tasks)
+            pfs = await asyncio.gather(*tasks, return_exceptions=True)
             for p_data in pfs:
-                accounts = p_data['account']
-                for account_data in accounts:
-                    if account_data['displayName'] is not None:
-                        new.append(account_data['id'])
-                        break
-                else:
-                    for account_data in accounts:
-                        if account_data['displayName'] is None:
-                            new.append(account_data['id'])
-                            break
+                if isinstance(p_data, Exception):
+                    continue
+                # REST版: 単一dictを返す {'id': ..., 'displayName': ...}
+                if isinstance(p_data, dict) and 'id' in p_data:
+                    new.append(p_data['id'])
 
         chunk_tasks = []
         chunks = [new[i:i + 100] for i in range(0, len(new), 100)]
         for chunk in chunks:
-            task = self.http.account_graphql_get_multiple_by_user_id(chunk)
+            # GraphQL版(404エラー)からREST版に変更
+            task = self.http.account_get_multiple_by_user_id(chunk)
             chunk_tasks.append(task)
 
         if len(chunks) > 0:
-            d = await asyncio.gather(*chunk_tasks)
+            d = await asyncio.gather(*chunk_tasks, return_exceptions=True)
             for results in d:
-                for result in results['accounts']:
+                if isinstance(results, Exception):
+                    continue
+                # REST版はリストを直接返す
+                for result in results:
                     if raw:
                         _users.append(result)
                     else:
@@ -755,14 +735,16 @@ class Client(rebootpy.Client):
         chunk_tasks = []
         chunks = [user_ids[i:i + 100] for i in range(0, len(user_ids), 100)]
         for chunk in chunks:
-            task = self.http.account_graphql_get_multiple_by_user_id(chunk)
+            task = self.http.account_get_multiple_by_user_id(chunk)
             chunk_tasks.append(task)
 
         users = {}
         if len(chunks) > 0:
-            d = await asyncio.gather(*chunk_tasks)
+            d = await asyncio.gather(*chunk_tasks, return_exceptions=True)
             for results in d:
-                for result in results['accounts']:
+                if isinstance(results, Exception):
+                    continue
+                for result in results:
                     users[result['id']] = self.store_user(result, try_cache=False)
         return users
 
@@ -783,32 +765,32 @@ class Client(rebootpy.Client):
         party.update_hide_users(self.party_hides[party_id])
         return party
 
-    async def set_presence(self, status: str, *,
-                           away: rebootpy.AwayStatus = rebootpy.AwayStatus.ONLINE) -> Callable:
+    def set_presence(self, status: str, *,
+                     away: rebootpy.AwayStatus = rebootpy.AwayStatus.ONLINE) -> None:
+        """
+        フレンドリストにカスタムステータス文字列をそのまま表示させる。
+        rebootpy標準のset_presenceはparty情報込みのconstruct_presenceを
+        経由するため、Fortniteクライアント側で「プレイ中」表示に
+        上書きされてカスタムテキストが見えなくなる問題があった。
+        ここではpartyを経由しないシンプルな辞書を直接渡す。
+        """
         if not isinstance(status, str):
             raise TypeError('status must be a str')
 
         self.status = status
         self.away = away
-        if self.party is not None:
-            status = self.party.construct_presence(status)
 
-        await self.xmpp.send_presence(
-            status=status,
+        self.xmpp.set_presence(
+            status={
+                'Status': status,
+                'bIsPlaying': False,
+                'bIsJoinable': False,
+                'bHasVoiceSupport': False,
+                'ProductName': 'Fortnite'
+            },
             show=away.value
         )
-
-    async def send_presence(self, status: Union[str, dict], *,
-                            away: rebootpy.AwayStatus = rebootpy.AwayStatus.ONLINE,
-                            to: Optional[aioxmpp.JID] = None) -> None:
-        if isinstance(status, str) and self.party is not None:
-            status = self.party.construct_presence(status)
-
-        await self.xmpp.send_presence(
-            status=status,
-            show=away.value,
-            to=to
-        )
+        print(f'[FORCE_DEBUG3] xmpp.stanza after set_presence: {self.xmpp.stanza!r}')
 
     async def close(self, *args: Any, **kwargs: Any) -> None:
         tasks = [super().close(*args, **kwargs)]
@@ -1953,7 +1935,7 @@ class Client(rebootpy.Client):
                         f'[{name}] {text}')
 
     def discord_party(self, text: str, name: Optional[str] = None) -> str:
-        name = user_name or (self.user.display_name if hasattr(self, "user") and self.user else "unknown")
+        name = name or (self.user.display_name if hasattr(self, "user") and self.user else "unknown")
         if getattr(self, 'party', None) is None:
             return self.time(text)
         else:
@@ -2567,8 +2549,7 @@ class Client(rebootpy.Client):
             )
         if self.party.config['privacy'] != self.config['fortnite']['party']['privacy'].value:
             await self.party.set_privacy(self.config['fortnite']['party']['privacy'])
-        if not self.party.voice_chat_enabled and self.config['fortnite']['party']['disable_voice_chat']:
-            await self.party.disable_voice_chat()
+        # rebootpyではvoice_chat関連機能が廃止されたため削除済み
 
     def is_valid_party(self, party_or_member: Union[rebootpy.party.PartyBase, rebootpy.PartyMember]) -> bool:
         if (self.party_id != (
@@ -2642,8 +2623,10 @@ class Client(rebootpy.Client):
 
     async def status_loop(self) -> None:
         while True:
-            if self.party is not None:
-                await self.send_presence(self.party.construct_presence())
+            try:
+                self.set_presence(self.status)
+            except Exception as e:
+                self.debug_print_exception(e)
             await asyncio.sleep(30)
 
     async def generate_device_auth(self) -> None:
@@ -2656,6 +2639,40 @@ class Client(rebootpy.Client):
         self.bot.store_device_auth_details(self.email, details)
 
     # Events
+    async def apply_config_cosmetics(self) -> None:
+        """config.jsonのoutfit/backpack/pickaxe/emote設定を起動時に反映する"""
+        items = [
+            'AthenaCharacter',
+            'AthenaBackpack',
+            'AthenaPickaxe',
+            'AthenaDance'
+        ]
+        for item in items:
+            conf = self.bot.convert_backend_type(item)
+            raw = self.config['fortnite'].get(conf)
+            if not raw:
+                continue
+
+            asset_path = self.bot.get_config_item_path(raw)
+            if not asset_path:
+                continue
+
+            variants = []
+            if item != 'AthenaDance' and self.config['fortnite'].get(f'{conf}_style') is not None:
+                for style in self.config['fortnite'][f'{conf}_style']:
+                    variant = self.bot.get_config_variant(style)
+                    if variant is not None:
+                        variants.extend(variant['variants'])
+
+            kwargs = {'variants': variants}
+            if item == 'AthenaDance':
+                kwargs = {'section': self.config['fortnite'].get(f'{conf}_section', 0)}
+
+            try:
+                await self.party.me.change_asset(item, asset_path, **kwargs)
+            except Exception as e:
+                self.debug_print_exception(e)
+
     async def event_ready(self) -> None:
         if self.bot.use_device_auth and not isinstance(self.auth, (rebootpy.AdvancedAuth, rebootpy.DeviceAuth)):
             self.loop.create_task(self.generate_device_auth())
@@ -2667,7 +2684,21 @@ class Client(rebootpy.Client):
         self.loop.create_task(self.status_loop())
 
         try:
-            await self.send_presence(self.party.last_raw_status)
+            self.set_presence(self.config['fortnite']['status'])
+            pt = getattr(self.xmpp, '_presence_task', None)
+            if pt is not None:
+                print(f'[FORCE_DEBUG4] presence_task done={pt.done()} cancelled={pt.cancelled()}')
+                if pt.done() and not pt.cancelled():
+                    exc = pt.exception()
+                    print(f'[FORCE_DEBUG4] presence_task exception={exc!r}')
+            else:
+                print('[FORCE_DEBUG4] presence_task attribute not found')
+        except Exception as e:
+            self.debug_print_exception(e)
+
+        # config.jsonのoutfit/backpack/pickaxe/emote設定を反映
+        try:
+            await self.apply_config_cosmetics()
         except Exception as e:
             self.debug_print_exception(e)
 
@@ -3038,11 +3069,7 @@ class Client(rebootpy.Client):
         local = locals()
 
         async def send_messages():
-            muc_party_id = None
-            if self.xmpp.muc_room is not None:
-                muc_party_id = self.xmpp.muc_room._mucjid.localpart[len('party-'):]
-            if muc_party_id != self.party.id:
-                await self.wait_for('muc_enter', timeout=5)
+            # rebootpyではmuc_room/muc_enterが廃止されたため待機不要
 
             var = self.variables
             var.update(local)
@@ -3821,7 +3848,7 @@ class Client(rebootpy.Client):
             )
             self.print_exception(e)
 
-    async def process_command(self, message: MyMessage, prefixes: Optional[list]) -> None:
+    async def process_command(self, message: MyMessage, prefixes: Optional[list] = None) -> None:
         if not message.args:
             return
 
