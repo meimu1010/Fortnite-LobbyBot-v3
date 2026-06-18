@@ -5,24 +5,6 @@ import platform
 import sys
 import traceback
 
-# =========================
-# Pythonバージョンチェック
-# =========================
-_ver = sys.version_info
-if _ver < (3, 9):
-    print(
-        f'エラー: Python {platform.python_version()} は非対応です。\n'
-        'Python 3.11 または 3.12 をインストールしてください。\n'
-        'ダウンロード: https://www.python.org/downloads/'
-    )
-    sys.exit(1)
-elif _ver < (3, 11):
-    print(
-        f'警告: Python {platform.python_version()} を使用しています。\n'
-        'Python 3.11 または 3.12 の使用を強く推奨します。\n'
-        'ダウンロード: https://www.python.org/downloads/'
-    )
-
 try:
     import aiohttp
     import colorama

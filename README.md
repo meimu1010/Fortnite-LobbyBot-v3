@@ -1,30 +1,20 @@
-# Not working anymore! Use https://fortnitelobbybots.com/ to create your own free Fortnite LobbyBots.
+# Fortnite LobbyBot v3
 
-# Fortnite LobbyBot Egg
-
-[![Python Version](https://img.shields.io/badge/Python-3.9-blue)](https://www.python.org/downloads/release/python-3913/)  
-[![Support Server](https://discordapp.com/api/guilds/926816871989252157/widget.png?style=banner2)](https://discord.gg/huguitis-nodes1free-hosting-926816871989252157)
-
-*Read this in [Español](README_ES.md) or [日本語](README_JA.md)*
+[![Python Version](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
 
 ---
 
-**Welcome to Fortnite LobbyBot Egg!**
+**Fortnite LobbyBot v3へようこそ!**
 
-## Overview
-[fortnitepy](https://github.com/Terbau/fortnitepy "github.com/Terbau/fortnitepy") library.
+## 概要
+[rebootpy](https://github.com/rebootpy/rebootpy "github.com/rebootpy/rebootpy") ライブラリを使用しています。
 
-## Install
-Follow the easy [Installation Instructions](docs/en/setup.md) to get started.
+## インストール
+[インストール手順](docs/en/setup.md)に従ってセットアップしてください。
 
-## Documentation
-[Explore the Documentation](docs/en/docs.md) for comprehensive guidance.
+## ドキュメント
+詳しい使い方は[ドキュメント](docs/en/docs.md)をご覧ください。
 
-## Cosmetic Changes
-*Note: The fix for cosmetic changes is private; it's the only thing not included here.*
-
-## License
+## ライセンス
 [MIT License](LICENSE)
-Use this software freely in any setting—commercial, non-commercial, modified, redistributed, etc. Please include the copyright notice and the full English license in a conspicuous place.
-
-Join our [Support Server](https://discord.gg/huguitis-nodes1free-hosting-926816871989252157) for assistance and camaraderie.
+このソフトウェアは商用・非商用、改変、再配布など、自由に利用できます。著作権表示と英語版ライセンス全文を、わかりやすい場所に記載してください。
