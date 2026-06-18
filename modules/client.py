@@ -790,7 +790,6 @@ class Client(rebootpy.Client):
             },
             show=away.value
         )
-        print(f'[FORCE_DEBUG3] xmpp.stanza after set_presence: {self.xmpp.stanza!r}')
 
     async def close(self, *args: Any, **kwargs: Any) -> None:
         tasks = [super().close(*args, **kwargs)]
@@ -2769,7 +2768,7 @@ class Client(rebootpy.Client):
             if request.friend.id in self.join_requests:
                 self.join_requests.pop(request.friend.id)
 
-        self.loop.call_later((request.expires_at - datetime.datetime.utcnow()).total_seconds(), remove)
+        self.loop.call_later((request.expires_at - datetime.datetime.now(datetime.timezone.utc)).total_seconds(), remove)
 
         if not self.is_valid_party(request):
             if self.config['loglevel'] == 'debug':
@@ -2993,8 +2992,8 @@ class Client(rebootpy.Client):
             await self.wait_until_ready()
 
         friend = after.friend
-        before_online = getattr(before, 'available', False)
-        after_online = after.available
+        before_online = before is not None
+        after_online = after is not None
         if before_online != after_online:
             if after_online:
                 await self.exec_event('friend_online', {**locals(), **self.variables})

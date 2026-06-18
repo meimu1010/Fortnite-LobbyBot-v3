@@ -696,8 +696,8 @@ def client_variables(client: 'Client', full: Optional[bool] = False) -> dict:
             ],
             'join_requests': [
                 {
-                    'name': client.name(request.requester, force_info=True),
-                    'id': request.requester.id
+                    'name': client.name(request.friend, force_info=True),
+                    'id': request.friend.id
                 } for request in client.join_requests.values()
             ],
             'friends': [

@@ -25,7 +25,8 @@
                 "emote": 1,
                 "set": 2,
                 "island_code": 1,
-                "status": 5
+                "status": 5,
+                "get_friend": 2
             }
         },
         "ngs": {}

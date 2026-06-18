@@ -88,7 +88,7 @@
                 "leave_delay_for": 0.0,
                 "refresh_on_reload": false,
                 "party": {
-                    "privacy": "PUBLIC",
+                    "privacy": "PRIVATE",
                     "max_size": 16,
                     "allow_swap": true,
                     "playlist": "<Playlist name='VK Play' id='Playlist_VK_Play'>"
