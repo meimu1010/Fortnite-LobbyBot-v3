@@ -31,5 +31,13 @@
             }
         },
         "ngs": {}
+    },
+    "3d01cc93526d4f6d856c96c54b34f58f": {
+        "commands": {
+            "WebUser": {
+                "outfit": 1
+            }
+        },
+        "ngs": {}
     }
 }

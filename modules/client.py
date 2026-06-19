@@ -701,7 +701,7 @@ class Client(rebootpy.Client):
         if len(tasks) > 0:
             pfs = await asyncio.gather(*tasks, return_exceptions=True)
             for p_data in pfs:
-                if isinstance(p_data, Exception):
+                if isinstance(p_data, BaseException):
                     continue
                 # REST版: 単一dictを返す {'id': ..., 'displayName': ...}
                 if isinstance(p_data, dict) and 'id' in p_data:
@@ -717,7 +717,7 @@ class Client(rebootpy.Client):
         if len(chunks) > 0:
             d = await asyncio.gather(*chunk_tasks, return_exceptions=True)
             for results in d:
-                if isinstance(results, Exception):
+                if isinstance(results, BaseException):
                     continue
                 # REST版はリストを直接返す
                 for result in results:
@@ -742,7 +742,7 @@ class Client(rebootpy.Client):
         if len(chunks) > 0:
             d = await asyncio.gather(*chunk_tasks, return_exceptions=True)
             for results in d:
-                if isinstance(results, Exception):
+                if isinstance(results, BaseException):
                     continue
                 for result in results:
                     users[result['id']] = self.store_user(result, try_cache=False)
@@ -4064,7 +4064,11 @@ class Client(rebootpy.Client):
                     self.debug_print_exception(e)
 
             if len(tasks) > 0:
-                await asyncio.wait(tasks)
+                done, _ = await asyncio.wait(tasks)
+                for task in done:
+                    exc = task.exception()
+                    if exc is not None:
+                        self.print_exception(exc)
 
             if not executed and self.custom_commands['run_when'] == 'after_command':
                 if await custom_commands():
@@ -4092,7 +4096,14 @@ class Client(rebootpy.Client):
                 variables = globals()
                 variables.update(select['globals'])
                 variables.update(select['variables'][num])
-                await self.bot.aexec(select['exec'], variables)
+                variables['message'] = message
+                try:
+                    await self.bot.aexec(select['exec'], variables)
+                except Exception as e:
+                    await message.reply(
+                        self.l('error') + f'\n{e.__class__.__name__}'
+                    )
+                    self.print_exception(e)
 
         if self.replies['run_when'] == 'after_command':
             if await replies():

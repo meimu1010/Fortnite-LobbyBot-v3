@@ -438,11 +438,12 @@ async def cosmetic_search(item: Optional[str], mode: str, command: Command,
         await client.show_help(command, message)
         return
 
-    async def set_cosmetic(cosmetic):
+    async def set_cosmetic(cosmetic, reply_message=None):
+        reply_message = reply_message or message
         item = cosmetic['type']['backendValue']
         attr = f'is_{client.bot.convert_backend_to_key(item)}_lock_for'
-        if getattr(client, attr)(message.user_type):
-            await message.reply(
+        if getattr(client, attr)(reply_message.user_type):
+            await reply_message.reply(
                 client.l('cosmetic_locked')
             )
             return
@@ -453,7 +454,7 @@ async def cosmetic_search(item: Optional[str], mode: str, command: Command,
         client.config['fortnite'][conf_key] = client.bot.get_item_str(cosmetic)
         client.bot.save_json('config', client.bot.config)
 
-        await message.reply(
+        await reply_message.reply(
             client.l(
                 'set_to',
                 cosmetic['type']['displayValue'],
@@ -483,7 +484,7 @@ async def cosmetic_search(item: Optional[str], mode: str, command: Command,
         await set_cosmetic(cosmetics[0])
     else:
         client.select[message.author.id] = {
-            'exec': 'await set_cosmetic(cosmetic)',
+            'exec': 'await set_cosmetic(cosmetic, message)',
             'globals': {**globals(), **locals()},
             'variables': [
                 {'cosmetic': cosmetic}

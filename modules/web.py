@@ -1258,7 +1258,12 @@ async def clients_viewer_client_ws(request: Request, ws: WebSocketConnection, nu
                 add_p=[lambda x: f'{client.name(message.author)} | {x}', client.time]
             )
             # WebUIからのコマンドはprefix不要（入力フォーム自体がコマンド専用のため）
-            await client.process_command(message, None)
+            try:
+                await client.process_command(message, None)
+            except Exception as e:
+                client.print_exception(e)
+                if not mes.result:
+                    mes.result = client.l('error') + f'\n{e.__class__.__name__}'
             await ws.send(json.dumps({
                 'type': 'response',
                 'response': mes.result

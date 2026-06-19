@@ -1,1 +1,7 @@
-{}
+{
+    "test1@gmail.com": {
+        "device_id": "d0ecea5a52fc41f79ad82d66e52f3a6f",
+        "account_id": "3d01cc93526d4f6d856c96c54b34f58f",
+        "secret": "MAASUA5P6OKB3EFIHZ2R7GB4356TQOZP"
+    }
+}

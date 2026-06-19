@@ -19,9 +19,9 @@ except ModuleNotFoundError:
     print(f'Python {platform.python_version()}\n')
     print(
         'Failed to load third party library. Please install the dependencies\n'
-        'Discord: @huguitis\n'
+        'Discord: @meimu69\n'
         'Or please join support Discord server\n'
-        'https://discord.gg/huguitis-nodes1free-hosting-926816871989252157'
+        'https://github.com/meimu1010/Fortnite-LobbyBot-v3'
     )
     sys.exit(1)
 
@@ -32,9 +32,9 @@ except ModuleNotFoundError:
     print(f'Python {platform.python_version()}\n')
     print(
         'Failed to load third party library. Please install the dependencies\n'
-        'Discord: @huguitis\n'
+        'Discord: @meimu69\n'
         'Or please join support Discord server\n'
-        'https://discord.gg/huguitis-nodes1free-hosting-926816871989252157'
+        'https://github.com/meimu1010/Fortnite-LobbyBot-v3'
     )
     sys.exit(1)
 
