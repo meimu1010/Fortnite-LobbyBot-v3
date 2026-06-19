@@ -2,10 +2,10 @@
     "clients": [
         {
             "fortnite": {
-                "email": "takeshi@gmail.com",
+                "email": "test1@gmail.com",
                 "nickname": null,
                 "owner": [
-                    "<User id='57adb5f3750f43659a63d31a8030c36e' display_name='ﱞこのゲームはオワコンﱞ' external_auths=[\"<ExternalAuth external_id=None external_display_name='rvvc rerto' type='xbl'>\", \"<ExternalAuth external_id='76561199690581230' external_display_name='野獣先輩' type='steam'>\"]>"
+                    ""
                 ],
                 "outfit": "<Item name='夜薔薇(再開花)' id='Character_RoseScour' path='Character_RoseScour'>",
                 "outfit_style": null,

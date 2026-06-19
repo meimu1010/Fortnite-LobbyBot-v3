@@ -1915,6 +1915,61 @@ class Client(rebootpy.Client):
                 text = func(text)
             self.webhook.send(text, name)
 
+    async def send_party_message(self, content: str) -> None:
+        """party.send() でメッセージを送信し、コンソール/Discord/Webクライアントビューアーへの
+        ログ出力もまとめて行うためのラッパー。
+        以前は client.party.send() を直接呼んでいたため、送信したメッセージが
+        コンソールログとクライアントビューアーのパーティーチャットに反映されていなかった。
+        """
+        try:
+            await self.party.send(content)
+        except rebootpy.errors.ChatError as e:
+            if 'alone' in str(e).lower():
+                self.send(
+                    'パーティーに自分1人だけのため、パーティーチャットを送信できません。'
+                    '誰か他のメンバーが参加している時に送信してください。',
+                    file=sys.stderr
+                )
+                return
+            raise
+        try:
+            tasks = self.dispatch_event('party_message_send', self.party, content)
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=False)
+        except Exception as e:
+            self.print_exception(e)
+        try:
+            self.send(
+                content,
+                user_name=self.user.display_name,
+                add_p=self.time_party,
+                add_d=self.discord_party
+            )
+        except Exception as e:
+            self.print_exception(e)
+
+    async def send_friend_message(self, friend: Any, content: str) -> None:
+        """friend.send() でささやき(DM)を送信し、コンソール/Discord/Webクライアントビューアーへの
+        ログ出力もまとめて行うためのラッパー。party版のsend_party_messageと同様の理由で必要。
+        """
+        await friend.send(content)
+        try:
+            tasks = self.dispatch_event('friend_message_send', friend, content)
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=False)
+        except Exception as e:
+            self.print_exception(e)
+        try:
+            name = self.name(friend)
+            self.send(
+                content,
+                user_name=name,
+                color=magenta,
+                add_p=[lambda x: f'{name} | {x}', self.time]
+            )
+        except Exception as e:
+            self.print_exception(e)
+
     def now(self) -> str:
         return self.bot.now()
 
@@ -2339,11 +2394,11 @@ class Client(rebootpy.Client):
                             var
                         )
                         if self.party.get_member(member.id) is not None:
-                            await self.party.send(text)
+                            await self.send_party_message(text)
                         else:
                             friend = self.get_friend(member.id)
                             if friend is not None:
-                                await friend.send(text)
+                                await self.send_friend_message(friend, text)
 
         # Platform
         if (self.is_ng_platform_for(self.get_user_type(member.id))
@@ -2371,11 +2426,11 @@ class Client(rebootpy.Client):
                     var
                 )
                 if self.party.get_member(member.id) is not None:
-                    await self.party.send(text)
+                    await self.send_party_message(text)
                 else:
                     friend = self.get_friend(member.id)
                     if friend is not None:
-                        await friend.send(text)
+                        await self.send_friend_message(friend, text)
 
         # Cosmetics
         items = [
@@ -2417,11 +2472,11 @@ class Client(rebootpy.Client):
                         var
                     )
                     if self.party.get_member(member.id) is not None:
-                        await self.party.send(text)
+                        await self.send_party_message(text)
                     else:
                         friend = self.get_friend(member.id)
                         if friend is not None:
-                            await friend.send(text)
+                            await self.send_friend_message(friend, text)
 
     async def ng_word_check(self, message: Union[rebootpy.FriendMessage, rebootpy.PartyMessage]) -> bool:
         if message.author.id == self.user.id:
@@ -2492,11 +2547,11 @@ class Client(rebootpy.Client):
                         )
                         if (self.party.get_member(message.author.id) is not None
                                 and isinstance(message, rebootpy.PartyMessage)):
-                            await self.party.send(text)
+                            await self.send_party_message(text)
                         else:
                             friend = self.get_friend(message.author.id)
                             if friend is not None:
-                                await friend.send(text)
+                                await self.send_friend_message(friend, text)
                 return False
         return True
 
@@ -3083,7 +3138,7 @@ class Client(rebootpy.Client):
                     var
                 )
                 try:
-                    await self.party.send(text)
+                    await self.send_party_message(text)
                 except Exception as e:
                     self.print_exception(e)
             friend = self.get_friend(member.id)
@@ -3093,7 +3148,7 @@ class Client(rebootpy.Client):
                     var
                 )
                 try:
-                    await friend.send(text)
+                    await self.send_friend_message(friend, text)
                 except Exception as e:
                     self.print_exception(e)
 
@@ -3105,7 +3160,7 @@ class Client(rebootpy.Client):
                     var
                 )
                 try:
-                    await self.party.send(text)
+                    await self.send_party_message(text)
                     self.send(
                         self.l(
                             'random_message',
@@ -3123,7 +3178,7 @@ class Client(rebootpy.Client):
                     var
                 )
                 try:
-                    await friend.send(text)
+                    await self.send_friend_message(friend, text)
                     self.send(
                         self.l(
                             'random_message',

@@ -11,7 +11,7 @@
             },
             "WebUser": {
                 "add_friend": 5,
-                "invite": 6,
+                "invite": 7,
                 "message": 3,
                 "level": 8,
                 "hide": 1,

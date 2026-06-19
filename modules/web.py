@@ -1215,7 +1215,7 @@ async def clients_viewer_client_ws(request: Request, ws: WebSocketConnection, nu
             if friend is None:
                 continue
             try:
-                await friend.send(data['content'])
+                await client.send_friend_message(friend, data['content'])
             except Exception as e:
                 client.debug_print_exception(e)
                 continue
@@ -1224,7 +1224,7 @@ async def clients_viewer_client_ws(request: Request, ws: WebSocketConnection, nu
             if party is None:
                 continue
             try:
-                await party.send(data['content'])
+                await client.send_party_message(data['content'])
             except Exception as e:
                 client.debug_print_exception(e)
                 continue

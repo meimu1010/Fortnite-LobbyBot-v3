@@ -2910,7 +2910,7 @@ class DefaultCommands:
                 )
                 return
 
-            await friend.send(content)
+            await client.send_friend_message(friend, content)
             await message.reply(
                 client.l(
                     'sent_message',
@@ -2959,7 +2959,7 @@ class DefaultCommands:
             await client.show_help(command, message)
             return
 
-        await client.party.send(
+        await client.send_party_message(
             ' '.join(message.args[1:])
         )
         if client.config['loglevel'] == 'normal':

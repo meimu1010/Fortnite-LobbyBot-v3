@@ -63,7 +63,8 @@ function declineJoinRequest(user_id) {
 
 function sendWhisper(element) {
     const user_id = element.parentElement.parentElement.id.slice('whisper_to_'.length);
-    const input = element.previousElementSibling;
+    const contentDiv = element.parentElement;
+    const input = contentDiv.querySelector('.chat_input');
     
     if (input.value == '') {
 
@@ -93,7 +94,7 @@ function sendWhisper(element) {
         user_id: user_id,
         content: input.value
     }));
-    element.previousElementSibling.value = '';
+    input.value = '';
 }
 
 function whisperKeyPress(key, element) {
@@ -188,6 +189,7 @@ socket.addEventListener('message', function(ev) {
     const party_message = document.getElementById('party_message')
     
     if (client.type == 'full' || client.type == 'diff') {
+        if (client.id) { window.myUserId = client.id; }
         name.textContent = client.name;
         party.textContent = client.party;
         incoming_friend_request.firstElementChild.textContent = client.incoming_friend_request;
@@ -416,7 +418,7 @@ socket.addEventListener('message', function(ev) {
             decline.classList.add('red_button');
             decline.value = texts.decline;
             decline.onclick = function () {
-                removeOrDeclineFriend('friend_request_decline', member.id);
+                removeOrDeclineFriend('friend_remove', member.id);
             }
             div.appendChild(decline);
 
@@ -835,7 +837,10 @@ socket.addEventListener('message', function(ev) {
     } else if (client.type == 'diff') {
         diffUpdate();
     } else if (client.type == 'friend_message') {
-        constructWhisper(client.to, client.author.display_name, client);
+        const isMe = (window.myUserId && client.author.id === window.myUserId);
+        const targetId = isMe ? client.to : client.author.id;
+        const targetName = document.getElementById(`whisper_to_${targetId}`)?.firstElementChild?.textContent || client.author.display_name;
+        constructWhisper(targetId, targetName, client);
     } else if (client.type == 'party_message') {
         constructPartyChat(client);
     } else if (client.type == 'clear_party_message') {
