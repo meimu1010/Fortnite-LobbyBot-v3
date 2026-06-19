@@ -2739,14 +2739,6 @@ class Client(rebootpy.Client):
 
         try:
             self.set_presence(self.config['fortnite']['status'])
-            pt = getattr(self.xmpp, '_presence_task', None)
-            if pt is not None:
-                print(f'[FORCE_DEBUG4] presence_task done={pt.done()} cancelled={pt.cancelled()}')
-                if pt.done() and not pt.cancelled():
-                    exc = pt.exception()
-                    print(f'[FORCE_DEBUG4] presence_task exception={exc!r}')
-            else:
-                print('[FORCE_DEBUG4] presence_task attribute not found')
         except Exception as e:
             self.debug_print_exception(e)
 

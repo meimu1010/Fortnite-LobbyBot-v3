@@ -1,3 +1,35 @@
+let _resHideTimer = null;
+
+function showRes(res, text, color) {
+    if (_resHideTimer !== null) {
+        clearTimeout(_resHideTimer);
+        _resHideTimer = null;
+    }
+    res.ontransitionend = null;
+    res.style.color = color || '';
+    res.innerText = text;
+    res.style.transform = 'translateX(-50%) translateY(0%)';
+    _resHideTimer = setTimeout(function () {
+        res.style.transform = 'translateX(-50%) translateY(-200px)';
+        _resHideTimer = null;
+    }, 1500);
+}
+
+const _flashErrorTimers = new WeakMap();
+
+function flashError(valueElement) {
+    if (_flashErrorTimers.has(valueElement)) {
+        clearTimeout(_flashErrorTimers.get(valueElement));
+    }
+    valueElement.ontransitionend = null;
+    valueElement.style.backgroundColor = '#F04747';
+    const timer = setTimeout(function () {
+        valueElement.style.backgroundColor = '';
+        _flashErrorTimers.delete(valueElement);
+    }, 700);
+    _flashErrorTimers.set(valueElement, timer);
+}
+
 function visualEnable() {
     const visualEditor = document.getElementById('visual_editor');
     const visualSave = document.getElementById('visual_save');
@@ -45,15 +77,7 @@ function saveVisual(reload = false) {
     request.onload = function (ev) {
         const data = JSON.parse(request.responseText);
         const res = document.getElementById('res');
-        res.style.color = data.color;
-        res.style.transform = 'translateX(-50%) translateY(0%)';
-        res.innerText = data.text;
-
-        res.ontransitionend = function () {
-            setTimeout(function () {
-                res.style.transform = 'translateX(-50%) translateY(-200px)';
-            }, 1500);
-        }
+        showRes(res, data.text, data.color);
 
         editor.setValue(JSON.stringify(data.data, null, 4));
 
@@ -78,14 +102,7 @@ function saveVisual(reload = false) {
             }
             const valueElement = document.getElementById(key);
             if (valueElement !== null) {
-                valueElement.style.backgroundColor = '#F04747';
-                valueElement.ontransitionend = function() {
-                    setTimeout(function () {
-                        if (valueElement !== null) {
-                            valueElement.style.backgroundColor = '';
-                        }
-                    }, 700);
-                }
+                flashError(valueElement);
             }
         }
     }
@@ -104,15 +121,7 @@ function saveRaw(reload = false) {
         request.onload = function (ev) {
             const data = JSON.parse(request.responseText);
             const res = document.getElementById('res');
-            res.style.color = data.color;
-            res.style.transform = 'translateX(-50%) translateY(0%)';
-            res.innerText = data.text;
-
-            res.ontransitionend = function () {
-                setTimeout(function () {
-                    res.style.transform = 'translateX(-50%) translateY(-200px)';
-                }, 1500);
-            }
+            showRes(res, data.text, data.color);
 
             editor.setValue(JSON.stringify(data.data, null, 4));
 
@@ -137,28 +146,13 @@ function saveRaw(reload = false) {
                 }
                 const valueElement = document.getElementById(key);
                 if (valueElement !== null) {
-                    valueElement.style.backgroundColor = '#F04747';
-                    valueElement.ontransitionend = function() {
-                        setTimeout(function () {
-                            if (valueElement !== null) {
-                                valueElement.style.backgroundColor = '';
-                            }
-                        }, 700);
-                    }
+                    flashError(valueElement);
                 }
             }
         }
     } catch {
         const res = document.getElementById('res');
-        res.style.color = '#F04747';
-        res.style.transform = 'translateX(-50%) translateY(0%)';
-        res.innerText = texts.invalid_json;
-
-        res.ontransitionend = function () {
-            setTimeout(function () {
-                res.style.transform = 'translateX(-50%) translateY(-200px)';
-            }, 1500);
-        }
+        showRes(res, texts.invalid_json, '#F04747');
 
         const shake = document.getElementById('shake');
         shake.style.animation = 'shake 400ms';

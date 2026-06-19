@@ -5,6 +5,26 @@ Array.from(openables).forEach(openable => {
     }
 });
 
+let _resHideTimer = null;
+
+function showRes(res, text, color) {
+    if (_resHideTimer !== null) {
+        clearTimeout(_resHideTimer);
+        _resHideTimer = null;
+    }
+    res.ontransitionend = null;
+    res.style.color = color || '';
+    res.innerHTML = '';
+    const pre = document.createElement('pre');
+    pre.innerText = text;
+    res.appendChild(pre);
+    res.style.transform = 'translateX(-50%) translateY(0%)';
+    _resHideTimer = setTimeout(function () {
+        res.style.transform = 'translateX(-50%) translateY(-200px)';
+        _resHideTimer = null;
+    }, 1500);
+}
+
 console.log('Connecting to websocket');
 const socket = new WebSocket(getWsAddr());
 
@@ -63,24 +83,15 @@ function declineJoinRequest(user_id) {
 
 function sendWhisper(element) {
     const user_id = element.parentElement.parentElement.id.slice('whisper_to_'.length);
-    const contentDiv = element.parentElement;
-    const input = contentDiv.querySelector('.chat_input');
+    const input = element.previousElementSibling;
     
     if (input.value == '') {
 
         const res = document.getElementById('res');
-        res.style.color = '#F04747';
-        res.style.transform = 'translateX(-50%) translateY(0%)';
-        res.innerText = texts.message_null;
+        showRes(res, texts.message_null, '#F04747');
 
         const shake = document.getElementById('shake');
         shake.style.animation = 'shake 400ms';
-
-        res.ontransitionend = function () {
-            setTimeout(function () {
-                res.style.transform = 'translateX(-50%) translateY(-200px)';
-            }, 1500);
-        }
 
         setTimeout(function () {
             shake.style.animation = '';
@@ -94,7 +105,7 @@ function sendWhisper(element) {
         user_id: user_id,
         content: input.value
     }));
-    input.value = '';
+    element.previousElementSibling.value = '';
 }
 
 function whisperKeyPress(key, element) {
@@ -109,18 +120,10 @@ function sendPartyMessage(element) {
     if (input.value == '') {
 
         const res = document.getElementById('res');
-        res.style.color = '#F04747';
-        res.style.transform = 'translateX(-50%) translateY(0%)';
-        res.innerText = texts.message_null;
+        showRes(res, texts.message_null, '#F04747');
 
         const shake = document.getElementById('shake');
         shake.style.animation = 'shake 400ms';
-
-        res.ontransitionend = function () {
-            setTimeout(function () {
-                res.style.transform = 'translateX(-50%) translateY(-200px)';
-            }, 1500);
-        }
 
         setTimeout(function () {
             shake.style.animation = '';
@@ -189,7 +192,6 @@ socket.addEventListener('message', function(ev) {
     const party_message = document.getElementById('party_message')
     
     if (client.type == 'full' || client.type == 'diff') {
-        if (client.id) { window.myUserId = client.id; }
         name.textContent = client.name;
         party.textContent = client.party;
         incoming_friend_request.firstElementChild.textContent = client.incoming_friend_request;
@@ -418,7 +420,7 @@ socket.addEventListener('message', function(ev) {
             decline.classList.add('red_button');
             decline.value = texts.decline;
             decline.onclick = function () {
-                removeOrDeclineFriend('friend_remove', member.id);
+                removeOrDeclineFriend('friend_request_decline', member.id);
             }
             div.appendChild(decline);
 
@@ -837,10 +839,7 @@ socket.addEventListener('message', function(ev) {
     } else if (client.type == 'diff') {
         diffUpdate();
     } else if (client.type == 'friend_message') {
-        const isMe = (window.myUserId && client.author.id === window.myUserId);
-        const targetId = isMe ? client.to : client.author.id;
-        const targetName = document.getElementById(`whisper_to_${targetId}`)?.firstElementChild?.textContent || client.author.display_name;
-        constructWhisper(targetId, targetName, client);
+        constructWhisper(client.to, client.author.display_name, client);
     } else if (client.type == 'party_message') {
         constructPartyChat(client);
     } else if (client.type == 'clear_party_message') {
@@ -854,18 +853,7 @@ socket.addEventListener('message', function(ev) {
         }
     } else if (client.type == 'response') {
         const res = document.getElementById('res');
-        res.innerHTML = '';
-        const pre = document.createElement('pre');
-        pre.innerText = client.response;
-        res.appendChild(pre);
-
-        res.style.color = '';
-        res.style.transform = 'translateX(-50%) translateY(0%)';
-        res.ontransitionend = function () {
-            setTimeout(function () {
-                res.style.transform = 'translateX(-50%) translateY(-200px)';
-            }, 1500);
-        }
+        showRes(res, client.response, '');
     }
 
     if (client.type == 'full' || client.type == 'diff') {

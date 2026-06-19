@@ -124,7 +124,7 @@ class DummyMessage:
         self.result = ''
 
     def reply(self, content: str) -> None:
-        self.result += f'\n{content}'
+        self.result += f'{content}' if not self.result else f'\n{content}'
 
 
 class MyMessage:
@@ -3027,13 +3027,6 @@ class DefaultCommands:
     )
     async def status(command: Command, client: 'Client', message: MyMessage) -> None:
         client.set_presence(' '.join(message.args[1:]))
-        pt = getattr(client.xmpp, '_presence_task', None)
-        if pt is not None:
-            print(f'[FORCE_DEBUG4] (statuscmd) presence_task done={pt.done()} cancelled={pt.cancelled()}')
-            if pt.done() and not pt.cancelled():
-                print(f'[FORCE_DEBUG4] (statuscmd) presence_task exception={pt.exception()!r}')
-        else:
-            print('[FORCE_DEBUG4] (statuscmd) presence_task not found')
         await message.reply(
             client.l(
                 'set_to',
