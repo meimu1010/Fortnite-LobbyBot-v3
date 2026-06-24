@@ -16,7 +16,7 @@
                 "level": 8,
                 "hide": 1,
                 "show": 1,
-                "promote": 1,
+                "promote": 2,
                 "ready": 1,
                 "sitout": 1,
                 "unready": 1,
@@ -27,7 +27,9 @@
                 "island_code": 1,
                 "status": 15,
                 "get_friend": 2,
-                "outfit": 6
+                "outfit": 6,
+                "kick": 3,
+                "add_whitelist": 2
             }
         },
         "ngs": {}
@@ -36,6 +38,16 @@
         "commands": {
             "WebUser": {
                 "outfit": 1
+            }
+        },
+        "ngs": {}
+    },
+    "d1669dbbba7d40cc83e6904607ab6d7e": {
+        "commands": {
+            "WebUser": {
+                "add_friend": 3,
+                "status": 8,
+                "get_friend": 22
             }
         },
         "ngs": {}

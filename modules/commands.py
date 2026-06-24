@@ -691,11 +691,12 @@ async def set_mimic(attr: str, keys: List[str], command: Command,
             me=message.author
         )
 
-        async def operation(user):
+        async def operation(user, reply_message=None):
+            reply_message = reply_message or message
             mimic = getattr(client, attr)
             if message.args[1] in client.commands['add']:
                 if user.id in mimic:
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'already_in_list',
                             client.l(attr),
@@ -707,7 +708,7 @@ async def set_mimic(attr: str, keys: List[str], command: Command,
                 key = 'add_to_list'
             else:
                 if user.id not in mimic:
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'not_in_list',
                             client.l(attr),
@@ -718,7 +719,7 @@ async def set_mimic(attr: str, keys: List[str], command: Command,
                 mimic.remove(user.id)
                 key = 'remove_from_list'
 
-            await message.reply(
+            await reply_message.reply(
                 client.l(
                     key,
                     client.l(attr),
@@ -744,7 +745,7 @@ async def set_mimic(attr: str, keys: List[str], command: Command,
             await operation(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await operation(user)',
+                'exec': 'await operation(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -1750,15 +1751,25 @@ class DefaultCommands:
                     f'{client.l("online") if friend.is_online() else client.l("offline")}\n'
                 )
                 if friend.last_presence:
-                    text += client.l(
-                        'status_info',
-                        friend.last_presence.status
-                    ) + '\n'
-                    if friend.last_presence.avatar:
+                    p = friend.last_presence
+                    if p.status:
                         text += client.l(
-                            'avatar_info',
-                            friend.last_presence.avatar.asset
+                            'status_info',
+                            p.status
                         ) + '\n'
+
+                    players_alive = (
+                        p.gameplay_stats.players_alive
+                        if p.gameplay_stats else None
+                    )
+                    if p.playlist and players_alive is not None:
+                        text += client.l(
+                            'in_match',
+                            p.playlist,
+                            players_alive
+                        ) + '\n'
+                    elif friend.is_online():
+                        text += client.l('in_lobby') + '\n'
                 if friend.last_logout:
                     text += client.l(
                         'last_logout_info',
@@ -1865,10 +1876,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def get_member(user):
+        async def get_member(user, reply_message=None):
+            reply_message = reply_message or message
             member = client.party.get_member(user.id)
             if member is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_found',
                         client.l('party_member'),
@@ -1890,7 +1902,7 @@ class DefaultCommands:
                     add_p=client.time,
                     add_d=client.debug_message
                 )
-            await message.reply(text)
+            await reply_message.reply(text)
 
         if client.config['search_max'] and len(users) > client.config['search_max']:
             await message.reply(
@@ -1910,7 +1922,7 @@ class DefaultCommands:
             await get_member(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await get_member(user)',
+                'exec': 'await get_member(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2037,9 +2049,10 @@ class DefaultCommands:
         if user is not None and user not in users:
             users.append(user)
 
-        async def add_friend(user):
+        async def add_friend(user, reply_message=None):
+            reply_message = reply_message or message
             if client.has_friend(user.id):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'already_friend_with_user',
                         client.name(user)
@@ -2047,9 +2060,9 @@ class DefaultCommands:
                 )
                 return
 
-            ret = await client.send_friend_request(user, message)
+            ret = await client.send_friend_request(user, reply_message)
             if not isinstance(ret, Exception):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'add_friend',
                         client.name(user)
@@ -2074,7 +2087,7 @@ class DefaultCommands:
             await add_friend(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await add_friend(user)',
+                'exec': 'await add_friend(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2104,10 +2117,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def remove_friend(user):
+        async def remove_friend(user, reply_message=None):
+            reply_message = reply_message or message
             friend = client.get_friend(user.id)
             if friend is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_friend_with_user',
                         client.name(user)
@@ -2115,9 +2129,9 @@ class DefaultCommands:
                 )
                 return
 
-            ret = await client.remove_friend(friend, message)
+            ret = await client.remove_friend(friend, reply_message)
             if not isinstance(ret, Exception):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'remove_friend',
                         client.name(friend)
@@ -2142,7 +2156,7 @@ class DefaultCommands:
             await remove_friend(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await remove_friend(user)',
+                'exec': 'await remove_friend(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2267,10 +2281,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def accept_pending(user):
-            ret = await client.accept_request(user, message)
+        async def accept_pending(user, reply_message=None):
+            reply_message = reply_message or message
+            ret = await client.accept_request(user, reply_message)
             if not isinstance(ret, Exception):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'accept_pending',
                         client.name(user)
@@ -2295,7 +2310,7 @@ class DefaultCommands:
             await accept_pending(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await accept_pending(user)',
+                'exec': 'await accept_pending(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2325,10 +2340,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def decline_pending(user):
-            ret = await client.decline_request(user, message)
+        async def decline_pending(user, reply_message=None):
+            reply_message = reply_message or message
+            ret = await client.decline_request(user, reply_message)
             if not isinstance(ret, Exception):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'decline_pending',
                         client.name(user)
@@ -2353,7 +2369,7 @@ class DefaultCommands:
             await decline_pending(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await decline_pending(user)',
+                'exec': 'await decline_pending(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2446,18 +2462,19 @@ class DefaultCommands:
         if user is not None and user not in users:
             users.append(user)
 
-        async def block_user(user):
+        async def block_user(user, reply_message=None):
+            reply_message = reply_message or message
             if client.is_blocked(user.id):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'already_blocked',
                         client.name(user)
                     )
                 )
 
-            ret = await client.user_block(user, message)
+            ret = await client.user_block(user, reply_message)
             if not isinstance(ret, Exception):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'block_user',
                         client.name(user)
@@ -2482,7 +2499,7 @@ class DefaultCommands:
             await block_user(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await block_user(user)',
+                'exec': 'await block_user(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2512,19 +2529,20 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def unblock_user(user):
+        async def unblock_user(user, reply_message=None):
+            reply_message = reply_message or message
             blocked_user = client.get_blocked_user(user.id)
             if blocked_user is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_blocking_user',
                         client.name(user)
                     )
                 )
 
-            ret = await client.user_unblock(blocked_user, message)
+            ret = await client.user_unblock(blocked_user, reply_message)
             if not isinstance(ret, Exception):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'unblock_user',
                         client.name(blocked_user)
@@ -2549,7 +2567,7 @@ class DefaultCommands:
             await unblock_user(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await unblock_user(user)',
+                'exec': 'await unblock_user(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2599,10 +2617,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def join(user):
+        async def join(user, reply_message=None):
+            reply_message = reply_message or message
             friend = client.get_friend(user.id)
             if friend is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_friend_with_user',
                         client.name(user)
@@ -2610,17 +2629,17 @@ class DefaultCommands:
                 )
                 return
 
-            ret = await client.join_party_friend(friend, message)
+            ret = await client.join_party_friend(friend, reply_message)
             if not isinstance(ret, Exception):
                 if client.config['loglevel'] == 'normal':
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'party_join_friend',
                             client.name(friend)
                         )
                     )
                 else:
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'party_join_friend_info',
                             client.name(friend),
@@ -2646,7 +2665,7 @@ class DefaultCommands:
             await join(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await join(user)',
+                'exec': 'await join(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2699,10 +2718,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def request_to_join(user):
+        async def request_to_join(user, reply_message=None):
+            reply_message = reply_message or message
             friend = client.get_friend(user.id)
             if friend is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_friend_with_user',
                         client.name(user)
@@ -2710,10 +2730,10 @@ class DefaultCommands:
                 )
                 return
             
-            ret = await client.send_join_request(friend, message)
+            ret = await client.send_join_request(friend, reply_message)
             if not isinstance(ret, Exception):
                 if client.config['loglevel'] == 'normal':
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'join_request_sent',
                             client.name(friend)
@@ -2738,7 +2758,7 @@ class DefaultCommands:
             await request_to_join(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await request_to_join(user)',
+                'exec': 'await request_to_join(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2786,10 +2806,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def invite(user):
+        async def invite(user, reply_message=None):
+            reply_message = reply_message or message
             friend = client.get_friend(user.id)
             if friend is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_friend_with_user',
                         client.name(user)
@@ -2797,17 +2818,17 @@ class DefaultCommands:
                 )
                 return
 
-            ret = await client.invite_friend(friend, message)
+            ret = await client.invite_friend(friend, reply_message)
             if not isinstance(ret, Exception):
                 if client.config['loglevel'] == 'normal':
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'user_invite',
                             client.name(friend)
                         )
                     )
                 else:
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'user_invite_info',
                             client.name(friend),
@@ -2833,7 +2854,7 @@ class DefaultCommands:
             await invite(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await invite(user)',
+                'exec': 'await invite(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -2900,10 +2921,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def send_message(user):
+        async def send_message(user, reply_message=None):
+            reply_message = reply_message or message
             friend = client.get_friend(user.id)
             if friend is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_friend_with_user',
                         client.name(user)
@@ -2912,7 +2934,7 @@ class DefaultCommands:
                 return
 
             await client.send_friend_message(friend, content)
-            await message.reply(
+            await reply_message.reply(
                 client.l(
                     'sent_message',
                     client.name(friend),
@@ -2938,7 +2960,7 @@ class DefaultCommands:
             await send_message(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await send_message(user)',
+                'exec': 'await send_message(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -3192,10 +3214,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def promote(user):
+        async def promote(user, reply_message=None):
+            reply_message = reply_message or message
             member = client.party.get_member(user.id)
             if member is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_in_party',
                         client.name(user)
@@ -3203,9 +3226,9 @@ class DefaultCommands:
                 )
                 return
 
-            ret = await client.promote_member(member, message)
+            ret = await client.promote_member(member, reply_message)
             if not isinstance(ret, Exception):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'promote',
                         client.name(member)
@@ -3230,7 +3253,7 @@ class DefaultCommands:
             await promote(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await promote(user)',
+                'exec': 'await promote(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -3266,10 +3289,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def kick(user):
+        async def kick(user, reply_message=None):
+            reply_message = reply_message or message
             member = client.party.get_member(user.id)
             if member is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_in_party',
                         client.name(user)
@@ -3277,9 +3301,9 @@ class DefaultCommands:
                 )
                 return
 
-            ret = await client.kick_member(member, message)
+            ret = await client.kick_member(member, reply_message)
             if not isinstance(ret, Exception):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'kick',
                         client.name(member)
@@ -3304,7 +3328,7 @@ class DefaultCommands:
             await kick(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await kick(user)',
+                'exec': 'await kick(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -3368,10 +3392,11 @@ class DefaultCommands:
                 me=message.author
             )
 
-            async def hide(user):
+            async def hide(user, reply_message=None):
+                reply_message = reply_message or message
                 member = client.party.get_member(user.id)
                 if member is None:
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'not_in_party',
                             client.name(user)
@@ -3379,9 +3404,9 @@ class DefaultCommands:
                     )
                     return
 
-                ret = await client.hide_member(member, message)
+                ret = await client.hide_member(member, reply_message)
                 if not isinstance(ret, Exception):
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'hide',
                             client.name(member)
@@ -3406,7 +3431,7 @@ class DefaultCommands:
                 await hide(users[0])
             else:
                 client.select[message.author.id] = {
-                    'exec': 'await hide(user)',
+                    'exec': 'await hide(user, message)',
                     'globals': {**globals(), **locals()},
                     'variables': [
                         {'user': user}
@@ -3467,10 +3492,11 @@ class DefaultCommands:
                 me=message.author
             )
 
-            async def show(user):
+            async def show(user, reply_message=None):
+                reply_message = reply_message or message
                 member = client.party.get_member(user.id)
                 if member is None:
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'not_in_party',
                             client.name(user)
@@ -3478,9 +3504,9 @@ class DefaultCommands:
                     )
                     return
 
-                ret = await client.show_member(member, message)
+                ret = await client.show_member(member, reply_message)
                 if not isinstance(ret, Exception):
-                    await message.reply(
+                    await reply_message.reply(
                         client.l(
                             'show',
                             client.name(member)
@@ -3505,7 +3531,7 @@ class DefaultCommands:
                 await show(users[0])
             else:
                 client.select[message.author.id] = {
-                    'exec': 'await show(user)',
+                    'exec': 'await show(user, message)',
                     'globals': {**globals(), **locals()},
                     'variables': [
                         {'user': user}
@@ -3606,10 +3632,11 @@ class DefaultCommands:
             me=message.author
         )
 
-        async def swap(user):
+        async def swap(user, reply_message=None):
+            reply_message = reply_message or message
             member = client.party.get_member(user.id)
             if member is None:
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'not_in_party',
                         client.name(user)
@@ -3617,9 +3644,9 @@ class DefaultCommands:
                 )
                 return
 
-            ret = await client.swap_member(member, message)
+            ret = await client.swap_member(member, reply_message)
             if not isinstance(ret, Exception):
-                await message.reply(
+                await reply_message.reply(
                     client.l(
                         'swap',
                         client.name(member)
@@ -3644,7 +3671,7 @@ class DefaultCommands:
             await swap(users[0])
         else:
             client.select[message.author.id] = {
-                'exec': 'await swap(user)',
+                'exec': 'await swap(user, message)',
                 'globals': {**globals(), **locals()},
                 'variables': [
                     {'user': user}
@@ -4236,10 +4263,11 @@ class DefaultCommands:
         corruption = client.party.me.corruption
         styles = client.searcher.get_style(asset)
 
-        async def set_style(style):
+        async def set_style(style, reply_message=None):
+            reply_message = reply_message or message
             attr = f'is_{client.bot.convert_backend_to_key(item)}_lock_for'
-            if getattr(client, attr)(message.user_type):
-                await message.reply(
+            if getattr(client, attr)(reply_message.user_type):
+                await reply_message.reply(
                     client.l('cosmetic_locked')
                 )
                 return
@@ -4258,7 +4286,7 @@ class DefaultCommands:
         else:
             client.select[message.author.id] = {
                 'exec': (
-                    'await set_style(style)'
+                    'await set_style(style, message)'
                 ),
                 'globals': {**globals(), **locals()},
                 'variables': [
@@ -4296,10 +4324,11 @@ class DefaultCommands:
         corruption = client.party.me.corruption
         styles = client.searcher.get_style(asset)
 
-        async def add_style(style):
+        async def add_style(style, reply_message=None):
+            reply_message = reply_message or message
             attr = f'is_{client.bot.convert_backend_to_key(item)}_lock_for'
-            if getattr(client, attr)(message.user_type):
-                await message.reply(
+            if getattr(client, attr)(reply_message.user_type):
+                await reply_message.reply(
                     client.l('cosmetic_locked')
                 )
                 return
@@ -4318,7 +4347,7 @@ class DefaultCommands:
         else:
             client.select[message.author.id] = {
                 'exec': (
-                    'await add_style(style)'
+                    'await add_style(style, message)'
                 ),
                 'globals': {**globals(), **locals()},
                 'variables': [

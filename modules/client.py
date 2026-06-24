@@ -4194,16 +4194,17 @@ class Client(rebootpy.Client):
                     or ('item_search' in self.whitelist_commands
                         and message.user_type in ['owner', 'whitelist'])
                     or 'item_search' in self.user_commands):
-                async def set_cosmetic(cosmetic):
+                async def set_cosmetic(cosmetic, reply_message=None):
+                    reply_message = reply_message or message
                     item = cosmetic["type"]["backendValue"]
                     attr = f'is_{self.bot.convert_backend_to_key(item)}_lock_for'
-                    if getattr(self, attr)(message.user_type):
-                        await message.reply(
+                    if getattr(self, attr)(reply_message.user_type):
+                        await reply_message.reply(
                             self.l('cosmetic_locked')
                         )
                         return
                     await self.party.me.change_asset(item, cosmetic['path'])
-                    await message.reply(
+                    await reply_message.reply(
                         self.l(
                             'set_to',
                             cosmetic['type']['displayValue'],
@@ -4226,7 +4227,7 @@ class Client(rebootpy.Client):
                     await set_cosmetic(cosmetics[0])
                 else:
                     self.select[message.author.id] = {
-                        'exec': 'await set_cosmetic(cosmetic)',
+                        'exec': 'await set_cosmetic(cosmetic, message)',
                         'globals': {**globals(), **locals()},
                         'variables': [
                             {'cosmetic': cosmetic}

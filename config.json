@@ -7,7 +7,7 @@
                 "owner": [
                     "<User id='57adb5f3750f43659a63d31a8030c36e' display_name='ﱞこのゲームはオワコンﱞ' external_auths=[\"<ExternalAuth external_id=None external_display_name='rvvc rerto' type='xbl'>\", \"<ExternalAuth external_id='76561199690581230' external_display_name='野獣先輩' type='steam'>\"]>"
                 ],
-                "outfit": "<Item name='Set_01_OA' id='CID_636_Athena_Commando_M_GalileoGondola_78MFZ' path='CID_636_Athena_Commando_M_GalileoGondola_78MFZ'>",
+                "outfit": null,
                 "outfit_style": null,
                 "ng_outfits": null,
                 "ng_outfit_for": [
@@ -115,7 +115,7 @@
                     "kick"
                 ],
                 "ng_name_reply": null,
-                "status": "✨Use code ItouMakoto in the shop!",
+                "status": "✨Use code yajuu in the shop!",
                 "accept_invite_for": [
                     "owner"
                 ],

@@ -18,9 +18,14 @@ function showRes(res, text, color) {
     const pre = document.createElement('pre');
     pre.innerText = text;
     res.appendChild(pre);
+    
+    // 表示状態にして位置を中央基準にリセット
+    res.style.display = 'block';
     res.style.transform = 'translateX(-50%) translateY(0%)';
+    
     _resHideTimer = setTimeout(function () {
-        res.style.transform = 'translateX(-50%) translateY(-200px)';
+        // 1.5秒後に完全に非表示にする
+        res.style.display = 'none';
         _resHideTimer = null;
     }, 1500);
 }
@@ -852,6 +857,7 @@ socket.addEventListener('message', function(ev) {
             }
         }
     } else if (client.type == 'response') {
+        if (client.response === '') return;
         const res = document.getElementById('res');
         showRes(res, client.response, '');
     }

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
 import os
-import asyncio
 import rebootpy
 from rebootpy.auth import DeviceAuth as _DeviceAuth
 
@@ -23,22 +22,22 @@ def store_device_auth_details(email: str, details: dict):
 
 
 class DebugDeviceAuth(_DeviceAuth):
-    """DeviceAuthのレスポンスをデバッグ出力する"""
+    """DeviceAuthのレスポンスをデバッグ出力する
+
+    注意: ios_authenticate()を自前で再実装すると、本来の実装に含まれる
+    「corrective_action_required（生年月日などの追加確認）」への自動対応
+    処理が失われてしまうため、ここでは本来の処理(super())をそのまま呼び、
+    デバッグ出力だけを追加する。
+    """
     async def ios_authenticate(self, priority: int = 0) -> dict:
-        payload = {
-            'grant_type': 'device_auth',
-            'device_id': self.device_id,
-            'account_id': self.account_id,
-            'secret': self.secret,
-            'token_type': self.access_token_type
-        }
-        print(f'[DEBUG] device_auth payload: {payload}')
+        print(
+            '[DEBUG] device_auth payload: '
+            f'grant_type=device_auth device_id={self.device_id} '
+            f'account_id={self.account_id} secret={"*" * 8 if self.secret else None} '
+            f'token_type={self.access_token_type}'
+        )
         try:
-            data = await self.client.http.account_oauth_grant(
-                auth=f'basic {self.ios_token}',
-                data=payload,
-                priority=priority
-            )
+            data = await super().ios_authenticate(priority=priority)
             print(f'[DEBUG] device_auth response keys: {list(data.keys())}')
             return data
         except rebootpy.HTTPException as e:
